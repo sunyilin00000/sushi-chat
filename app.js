@@ -1,5 +1,5 @@
 // ==================== 配置区 ====================
-const API_BASE = "https://service-xxx.gz.apigw.tencentcs.com/release"; // 你的腾讯云函数地址
+const API_BASE = "https://1502956590-kn3mzt8tfh.ap-nanjing.tencentscf.com";
 const ROLE = "sushi"; // 默认角色
 
 // ==================== 用户注册模块 ====================
