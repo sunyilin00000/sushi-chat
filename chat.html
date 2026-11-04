@@ -3,365 +3,345 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>与苏轼对话</title>
-  <link rel="stylesheet" href="style.css">
+  <title>夜谈 - 与苏轼对话</title>
   <style>
-    /* 新增：密钥门样式 */
-    #keyGate {
-      max-width: 500px;
-      margin: 50px auto;
-      padding: 30px;
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif; 
+      background: #0a0a0f; 
+      color: #e0e0e0; 
+      height: 100vh; 
+      display: flex; 
+      flex-direction: column; 
+    }
+    .chat-header { 
+      padding: 20px; 
+      border-bottom: 1px solid #1a1a2e; 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+    }
+    .role-info h1 { font-size: 20px; color: #c9a063; }
+    .role-info p { font-size: 13px; color: #666; }
+    .user-info { font-size: 13px; color: #4a9eff; }
+    .chat-box { 
+      flex: 1; 
+      overflow-y: auto; 
+      padding: 20px; 
+      display: flex; 
+      flex-direction: column; 
+      gap: 16px; 
+    }
+    .message { display: flex; }
+    .message.user { justify-content: flex-end; }
+    .message.assistant { justify-content: flex-start; }
+    .bubble { 
+      max-width: 75%; 
+      padding: 16px 20px; 
+      border-radius: 12px; 
+      line-height: 1.6; 
+      font-size: 15px;
+      white-space: pre-wrap;
+    }
+    .message.user .bubble { 
+      background: #1F2A44; 
+      color: white; 
+      border-bottom-right-radius: 4px; 
+    }
+    .message.assistant .bubble { 
+      background: #14141f; 
+      color: #e0e0e0; 
+      border: 1px solid #2a2a3a;
+      border-bottom-left-radius: 4px; 
+    }
+    .bubble .pause { color: #666; font-style: italic; }
+    .bubble .perception { 
+      color: #c9a063; 
+      font-size: 13px; 
+      margin-top: 8px; 
+      padding-top: 8px; 
+      border-top: 1px dashed #3a3a4a;
+    }
+    .input-area { 
+      padding: 20px; 
+      border-top: 1px solid #1a1a2e; 
+      display: flex; 
+      gap: 12px; 
+    }
+    .input-area input { 
+      flex: 1; 
+      padding: 14px; 
+      background: #14141f; 
+      border: 1px solid #2a2a3a; 
+      border-radius: 24px; 
+      color: white; 
+      font-size: 15px; 
+    }
+    .input-area input:focus { outline: none; border-color: #c9a063; }
+    .btn-send { 
+      padding: 14px 24px; 
+      background: #1F2A44; 
+      color: white; 
+      border: none; 
+      border-radius: 24px; 
+      cursor: pointer; 
+      font-size: 15px; 
+    }
+    .btn-send:disabled { opacity: 0.5; }
+    /* 终局样式 */
+    .terminal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      z-index: 1000;
       text-align: center;
-    }
-    #keyGate h3 {
-      color: #1F2A44;
-      margin-bottom: 20px;
-      font-size: 20px;
-    }
-    #keyGate input {
-      width: 100%;
-      padding: 14px;
-      border: 2px solid #e0e0e0;
-      border-radius: 8px;
-      font-size: 16px;
-      margin-bottom: 16px;
-      box-sizing: border-box;
-    }
-    #keyGate input:focus {
-      border-color: #1F2A44;
-      outline: none;
-    }
-    #keyGate button {
-      width: 100%;
-      padding: 14px;
-      background: #1F2A44;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-size: 16px;
-      cursor: pointer;
-      font-weight: bold;
-    }
-    #keyGate button:hover {
-      background: #2a3a5c;
-    }
-    #keyGate .error {
-      color: #dc3545;
-      font-size: 14px;
-      margin-top: 12px;
-      display: none;
-    }
-    #keyGate .hint {
-      color: #999;
-      font-size: 13px;
-      margin-top: 16px;
-    }
-    /* 新增：历史记录加载提示 */
-    .history-loading {
-      text-align: center;
-      color: #999;
-      font-size: 13px;
       padding: 20px;
     }
+    .terminal-overlay h2 { color: #c9a063; margin-bottom: 20px; font-size: 24px; }
+    .terminal-overlay p { color: #888; margin-bottom: 12px; line-height: 1.8; }
+    .terminal-overlay .stats { 
+      background: #14141f; 
+      padding: 20px; 
+      border-radius: 12px; 
+      margin: 20px 0;
+      border: 1px solid #2a2a3a;
+    }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
-  <!-- 密钥门（新增） -->
-  <div id="keyGate">
-    <h3>输入访问密钥</h3>
-    <input type="password" id="accessKey" placeholder="请输入团队提供的密钥" maxlength="50">
-    <button onclick="unlockChat()">解锁对话</button>
-    <div class="error" id="keyError">密钥错误，请重试</div>
-    <div class="hint">密钥可向星环团队索取<br>测试密钥：xinghuan2026</div>
+  <div class="chat-header">
+    <div class="role-info">
+      <h1>苏轼</h1>
+      <p id="subtitle">元丰五年，黄州。夜。</p>
+    </div>
+    <div class="user-info" id="userInfo"></div>
   </div>
 
-  <!-- 原有聊天界面（初始隐藏） -->
-  <div class="chat-container" id="chatContainer" style="display: none;">
-    <div class="chat-header">
-      <div class="role-info">
-        <h1 id="roleName">苏轼</h1>
-        <p id="roleTitle">北宋文学家</p>
-      </div>
-      <div class="user-info" id="userInfo"></div>
-    </div>
+  <div class="chat-box" id="chatBox"></div>
 
-    <div class="chat-box" id="chatBox">
-      <div class="history-loading" id="historyLoading">正在加载历史记录...</div>
-    </div>
-
-    <div class="input-area">
-      <input type="text" id="userInput" placeholder="输入你的问题..." 
-             onkeypress="if(event.key==='Enter') sendMessage()">
-      <button class="btn-send" onclick="sendMessage()">发送</button>
-    </div>
+  <div class="input-area">
+    <input type="text" id="userInput" placeholder="输入你的问题..." autocomplete="off">
+    <button class="btn-send" id="sendBtn" onclick="sendMessage()">发送</button>
   </div>
 
-  <script src="app.js"></script>
+  <!-- 终局覆盖层 -->
+  <div id="terminalOverlay" class="terminal-overlay hidden">
+    <h2>他走了</h2>
+    <div class="stats" id="terminalStats"></div>
+    <p style="font-size: 13px; color: #666;">没有重新开始，只有新的复活</p>
+  </div>
+
   <script>
     // ===== 配置 =====
-    const API_BASE = "https://1502956590-kn3mzt8tfh.ap-nanjing.tencentscf.com"; // 你的 chatWithRole 函数 URL
-    const ROLE = "sushi";
-    
-    // ===== 全局变量 =====
-    let userKey = localStorage.getItem("sushi_key") || "";
-    let conversationHistory = [];
-    let isLoading = false;
+    const API_BASE = "https://1502956590-kn3mzt8tfh.ap-nanjing.tencentscf.com"; // chatWithRole URL
+    const token = localStorage.getItem("xinghuan_token");
+    if (!token) {
+      alert("请先登录星环终端");
+      window.location.href = "member.html";
+    }
 
-    // ===== 页面初始化 =====
-    window.onload = function() {
-      if (userKey) {
-        // 已存储密钥，直接显示聊天界面
-        showChatInterface();
-      } else {
-        // 未存储密钥，显示密钥门
-        document.getElementById("keyGate").style.display = "block";
-        document.getElementById("chatContainer").style.display = "none";
-      }
+    // ===== 行为采集（核心）=====
+    let behavior = {
+      first_char_delay: 0,      // 首字延迟（ms）
+      total_input_time: 0,      // 总输入时长（ms）
+      delete_count: 0,          // 退格次数
+      rewrite_count: 0,         // 整段重写次数（输入>10字后全删）
+      pause_before_send: 0,     // 发送前停顿（ms）
+      typing_speed: [],         // 打字速度曲线（字/秒）
+      focus_blur_count: 0,      // 打开又关闭次数
+      last_input_length: 0,     // 上次输入长度（检测重写）
+      start_time: 0,            // 开始输入时间
+      last_key_time: 0,         // 上次按键时间（检测停顿）
+      pause_points: []          // 停顿位置记录
     };
 
-    // ===== 解锁聊天 =====
-    async function unlockChat() {
-      const inputKey = document.getElementById("accessKey").value.trim();
-      if (!inputKey) {
-        alert("请输入密钥");
-        return;
-      }
+    let currentInput = "";
+    let isComposing = false;
 
-      // 简单前端验证（实际验证在后端）
-      if (inputKey.length < 6) {
-        document.getElementById("keyError").style.display = "block";
-        return;
+    const input = document.getElementById("userInput");
+    
+    // 聚焦时记录
+    input.addEventListener("focus", () => {
+      if (behavior.start_time === 0) {
+        behavior.start_time = Date.now();
       }
+      behavior.focus_blur_count++;
+    });
 
-      // 存储密钥并尝试加载
-      userKey = inputKey;
-      localStorage.setItem("sushi_key", userKey);
+    // 失焦时记录
+    input.addEventListener("blur", () => {
+      if (currentInput.length > 0) {
+        behavior.focus_blur_count++;
+      }
+    });
+
+    // 键盘事件
+    input.addEventListener("keydown", (e) => {
+      const now = Date.now();
       
-      // 尝试加载历史记录验证密钥有效性
-      const valid = await loadHistory();
-      if (valid) {
-        showChatInterface();
-      } else {
-        // 密钥无效
-        localStorage.removeItem("sushi_key");
-        userKey = "";
-        document.getElementById("keyError").style.display = "block";
-        document.getElementById("accessKey").value = "";
-      }
-    }
-
-    // ===== 显示聊天界面 =====
-    function showChatInterface() {
-      document.getElementById("keyGate").style.display = "none";
-      document.getElementById("chatContainer").style.display = "flex";
-      
-      // 显示用户信息（从 localStorage 或默认值）
-      const savedProfile = localStorage.getItem("userProfile");
-      if (savedProfile) {
-        const profile = JSON.parse(savedProfile);
-        document.getElementById("userInfo").innerHTML = 
-          `${profile.nickname || '访客'} | ${profile.grade || ''}`;
+      // 首字延迟
+      if (behavior.first_char_delay === 0 && input.value.length === 0 && e.key.length === 1) {
+        behavior.first_char_delay = now - behavior.start_time;
       }
       
-      // 加载历史记录
-      loadHistory().then(() => {
-        // 历史加载完成后，显示开场白或最后一条消息
-        if (conversationHistory.length === 0) {
-          addMessage("assistant", "呵呵，今日想聊些什么？");
+      // 退格计数
+      if (e.key === "Backspace" || e.key === "Delete") {
+        behavior.delete_count++;
+        // 检测整段重写：输入超过10字后删到0
+        if (input.value.length > 10 && input.value.length - 1 === 0) {
+          behavior.rewrite_count++;
         }
-      });
-    }
+      }
+      
+      // 打字速度（每5个字记录一次时间戳）
+      if (e.key.length === 1 && input.value.length % 5 === 0) {
+        behavior.typing_speed.push(now);
+      }
+      
+      behavior.last_key_time = now;
+    });
 
-    // ===== 加载历史记录（新增）=====
-    async function loadHistory() {
-      try {
-        const response = await fetch(API_BASE, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "get_history",  // 假设后端有这个接口，如果没有会返回错误
-            userKey: userKey
-          })
+    // 输入事件（检测停顿）
+    input.addEventListener("input", () => {
+      const now = Date.now();
+      currentInput = input.value;
+      
+      // 检测长停顿（>2秒）
+      if (behavior.last_key_time > 0 && now - behavior.last_key_time > 2000) {
+        behavior.pause_points.push({
+          position: input.value.length,
+          duration: now - behavior.last_key_time
         });
-        
-        const data = await response.json();
-        
-        // 如果返回 401，说明密钥无效
-        if (response.status === 401) {
-          return false;
-        }
-        
-        // 如果成功获取历史
-        if (data.history && Array.isArray(data.history)) {
-          conversationHistory = data.history;
-          // 渲染历史到界面
-          renderHistory();
-        }
-        
-        document.getElementById("historyLoading").style.display = "none";
-        return true;
-      } catch (err) {
-        console.error("加载历史失败:", err);
-        // 网络错误也允许进入，只是没有历史
-        document.getElementById("historyLoading").style.display = "none";
-        return true; // 暂时允许进入，后端会再验证
       }
-    }
-
-    // ===== 渲染历史记录 =====
-    function renderHistory() {
-      const chatBox = document.getElementById("chatBox");
-      chatBox.innerHTML = ""; // 清空加载提示
-      
-      conversationHistory.forEach(msg => {
-        addMessageToDOM(msg.role, msg.content);
-      });
-      
-      // 滚动到底部
-      chatBox.scrollTop = chatBox.scrollHeight;
-    }
-
-    // ===== 添加消息到界面（不发送）=====
-    function addMessageToDOM(role, content) {
-      const chatBox = document.getElementById("chatBox");
-      const div = document.createElement("div");
-      div.className = `message ${role}`;
-      
-      // 检查是否包含记忆标记
-      let displayContent = content;
-      let memoryTag = "";
-      if (content.includes("[记忆]")) {
-        displayContent = content.replace("[记忆]", "");
-        memoryTag = `<div class="memory-tag">已记入记忆</div>`;
-      }
-
-      div.innerHTML = `
-        <div class="bubble">
-          ${escapeHtml(displayContent)}
-          ${memoryTag}
-        </div>
-      `;
-      
-      chatBox.appendChild(div);
-    }
+    });
 
     // ===== 发送消息 =====
     async function sendMessage() {
-      const input = document.getElementById("userInput");
       const text = input.value.trim();
-      if (!text || isLoading) return;
+      if (!text) return;
+
+      const now = Date.now();
+      behavior.pause_before_send = now - (behavior.last_key_time || now);
+      behavior.total_input_time = now - behavior.start_time;
+
+      // 计算打字速度（字/秒）
+      let speed = 0;
+      if (behavior.typing_speed.length > 1) {
+        const duration = (behavior.typing_speed[behavior.typing_speed.length-1] - behavior.typing_speed[0]) / 1000;
+        speed = (text.length / duration).toFixed(2);
+      }
+
+      // 构建行为向量
+      const behaviorVector = {
+        first_char_delay: behavior.first_char_delay,
+        total_input_time: behavior.total_input_time,
+        delete_count: behavior.delete_count,
+        rewrite_count: behavior.rewrite_count,
+        pause_before_send: behavior.pause_before_send,
+        typing_speed: parseFloat(speed),
+        focus_blur_count: behavior.focus_blur_count,
+        pause_count: behavior.pause_points.length,
+        text_length: text.length
+      };
+
+      // 重置行为采集
+      behavior = {
+        first_char_delay: 0, total_input_time: 0, delete_count: 0,
+        rewrite_count: 0, pause_before_send: 0, typing_speed: [],
+        focus_blur_count: 0, last_input_length: 0, start_time: 0,
+        last_key_time: 0, pause_points: []
+      };
 
       // 显示用户消息
       addMessage("user", text);
       input.value = "";
-      isLoading = true;
-
-      // 构建发送的消息历史（最近 10 条）
-      const messagesToSend = conversationHistory.slice(-10).map(m => ({
-        role: m.role,
-        content: m.content
-      }));
-      messagesToSend.push({ role: "user", content: text });
+      document.getElementById("sendBtn").disabled = true;
 
       try {
         const response = await fetch(API_BASE, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            role: ROLE,
-            messages: messagesToSend,
-            userProfile: getUserProfile(),
-            userKey: userKey  // 新增：传递密钥
+            messages: [{ role: "user", content: text }],
+            token: token,
+            behavior: behaviorVector  // 关键：传递行为数据
           })
         });
 
         const data = await response.json();
         
         if (response.status === 401) {
-          // 密钥失效，踢回密钥门
-          alert("密钥已失效，请重新输入");
-          localStorage.removeItem("sushi_key");
+          alert("登录已过期");
+          localStorage.clear();
           location.reload();
           return;
         }
 
-        if (data.error) {
-          addMessage("assistant", `出错：${data.error}`);
+        if (data.state === "terminal") {
+          // 终局
+          showTerminal(data.session_stats);
         } else {
-          // 显示 AI 回复
-          addMessage("assistant", data.reply);
-          
-          // 更新本地历史
-          conversationHistory.push(
-            { role: "user", content: text },
-            { role: "assistant", content: data.reply }
-          );
-          
-          // 限制本地历史长度（防止内存溢出）
-          if (conversationHistory.length > 50) {
-            conversationHistory = conversationHistory.slice(-50);
-          }
-          
-          // 如果后端返回了更新后的历史，可以同步（可选）
-          if (data.full_history) {
-            conversationHistory = data.full_history;
-          }
+          // 显示苏轼回复（包含感知时刻）
+          addMessage("assistant", data.reply, data.perception);
         }
-      } catch (error) {
-        console.error("发送失败:", error);
-        addMessage("assistant", "网络不畅，请稍后再试。");
+      } catch (err) {
+        addMessage("assistant", "……（网络不畅）");
       } finally {
-        isLoading = false;
+        document.getElementById("sendBtn").disabled = false;
+        input.focus();
       }
     }
 
-    // ===== 添加消息（带发送）=====
-    function addMessage(role, content) {
-      addMessageToDOM(role, content);
-      
-      // 滚动到底部
+    // ===== 添加消息到界面 =====
+    function addMessage(role, content, perception) {
       const chatBox = document.getElementById("chatBox");
+      const div = document.createElement("div");
+      div.className = `message ${role}`;
+      
+      let html = "";
+      if (role === "assistant") {
+        // 处理停顿标记
+        html = content.replace(/\.\.\./g, '<span class="pause">……</span>');
+        // 添加感知时刻（如果存在）
+        if (perception) {
+          html += `<div class="perception">${perception}</div>`;
+        }
+      } else {
+        html = content;
+      }
+
+      div.innerHTML = `<div class="bubble">${html}</div>`;
+      chatBox.appendChild(div);
       chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    // ===== 获取用户资料 =====
-    function getUserProfile() {
-      const saved = localStorage.getItem("userProfile");
-      if (saved) {
-        return JSON.parse(saved);
-      }
-      return {
-        nickname: "访客",
-        grade: "未知",
-        interest: "诗词"
-      };
+    // ===== 终局显示 =====
+    function showTerminal(stats) {
+      const overlay = document.getElementById("terminalOverlay");
+      const statsDiv = document.getElementById("terminalStats");
+      
+      statsDiv.innerHTML = `
+        <p>这一局，你说了 ${stats.total_questions} 句话</p>
+        <p>其中 ${stats.force_count} 句，在逼他</p>
+        <p>你犹豫了 ${stats.hesitation_count} 次</p>
+        <p style="margin-top: 12px; color: #c9a063;">${stats.ending_variant}</p>
+      `;
+      
+      overlay.classList.remove("hidden");
     }
 
-    // ===== 工具函数 =====
-    function escapeHtml(text) {
-      const div = document.createElement("div");
-      div.textContent = text;
-      return div.innerHTML;
-    }
-
-    // ===== 退出登录（清除密钥）=====
-    function logout() {
-      if (confirm("确定要退出吗？需要重新输入密钥才能对话。")) {
-        localStorage.removeItem("sushi_key");
-        localStorage.removeItem("userProfile");
-        location.reload();
-      }
-    }
-
-    // 按 Ctrl+Shift+L 退出（隐藏功能）
-    document.addEventListener("keydown", function(e) {
-      if (e.ctrlKey && e.shiftKey && e.key === "L") {
-        logout();
-      }
+    // 回车发送
+    document.getElementById("userInput").addEventListener("keypress", (e) => {
+      if (e.key === "Enter") sendMessage();
     });
+
+    // 初始化
+    document.getElementById("userInfo").textContent = localStorage.getItem("xinghuan_name") || "访客";
   </script>
 </body>
 </html>
