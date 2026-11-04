@@ -3,54 +3,211 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>历史角色互动 - 用户注册</title>
-  <link rel="stylesheet" href="style.css">
+  <title>星环终端 - 团队工作台</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f5f5; color: #333; }
+    .header { background: #1F2A44; color: white; padding: 20px; text-align: center; border-radius: 0 0 12px 12px; }
+    .header h1 { font-size: 20px; margin-bottom: 4px; }
+    .header p { font-size: 13px; opacity: 0.8; }
+    .container { max-width: 500px; margin: 0 auto; padding: 20px; }
+    .card { background: white; border-radius: 12px; padding: 24px; margin-top: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .card h2 { font-size: 16px; margin-bottom: 16px; color: #1F2A44; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 13px; color: #666; margin-bottom: 6px; }
+    .form-group input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; }
+    .btn { width: 100%; padding: 14px; background: #1F2A44; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin-top: 8px; }
+    .btn:hover { background: #2a3a5c; }
+    .btn-secondary { background: #0066cc; }
+    .btn-secondary:hover { background: #0052a3; }
+    .btn-admin { background: #dc3545; }
+    .btn-admin:hover { background: #b02a37; }
+    .menu-btn { display: block; width: 100%; padding: 20px; margin-bottom: 16px; border: none; border-radius: 12px; font-size: 18px; cursor: pointer; text-align: left; color: white; transition: all 0.3s; }
+    .menu-btn small { display: block; font-size: 13px; opacity: 0.8; margin-top: 4px; }
+    .menu-btn.primary { background: #1F2A44; }
+    .menu-btn.secondary { background: #0066cc; }
+    .menu-btn.admin { background: #dc3545; }
+    .tabs { display: flex; border-bottom: 2px solid #eee; margin-bottom: 16px; }
+    .tab { flex: 1; text-align: center; padding: 12px; cursor: pointer; color: #666; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+    .tab.active { color: #1F2A44; border-bottom-color: #1F2A44; font-weight: bold; }
+    .hidden { display: none !important; }
+    .error-msg { color: #dc3545; font-size: 13px; margin-top: 8px; display: none; }
+  </style>
 </head>
 <body>
+  <div class="header">
+    <h1>星环终端</h1>
+    <p id="userInfo">团队内部系统</p>
+  </div>
+
   <div class="container">
-    <div class="header">
-      <h1>历史角色互动</h1>
-      <p class="subtitle">与苏轼的对话之旅</p>
+    <!-- 登录/注册 -->
+    <div id="authSection" class="card">
+      <h2>成员登录</h2>
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('login')">登录</div>
+        <div class="tab" onclick="switchTab('register')">首次注册</div>
+      </div>
+      
+      <div id="loginForm">
+        <div class="form-group">
+          <label>账号</label>
+          <input type="text" id="loginUsername" placeholder="用户名">
+        </div>
+        <div class="form-group">
+          <label>密码</label>
+          <input type="password" id="loginPassword" placeholder="密码">
+        </div>
+        <div class="error-msg" id="loginError">账号或密码错误</div>
+        <button class="btn" onclick="login()">登录</button>
+      </div>
+
+      <div id="registerForm" class="hidden">
+        <div class="form-group">
+          <label>邀请码（向组长索取）</label>
+          <input type="text" id="regInvite" placeholder="如：xh001">
+        </div>
+        <div class="form-group">
+          <label>设置账号</label>
+          <input type="text" id="regUsername" placeholder="用户名（英文）">
+        </div>
+        <div class="form-group">
+          <label>设置密码</label>
+          <input type="password" id="regPassword" placeholder="密码">
+        </div>
+        <div class="error-msg" id="regError">邀请码无效或账号已存在</div>
+        <button class="btn btn-secondary" onclick="register()">注册并登录</button>
+      </div>
     </div>
 
-    <div class="card" id="registerCard">
-      <h2>首次使用，请完善信息</h2>
-      <p class="desc">为了提供个性化的对话体验，请告诉我们你的称呼</p>
-      
-      <div class="form-group">
-        <label for="nickname">你的称呼</label>
-        <input type="text" id="nickname" placeholder="例如：小明、同学、子涵" maxlength="10">
+    <!-- 功能菜单 -->
+    <div id="menuSection" class="hidden">
+      <div class="card">
+        <h2 style="margin-bottom: 20px;">选择功能</h2>
+        
+        <button class="menu-btn primary" onclick="goChat()">
+          与苏轼对话
+          <small>AI 历史角色互动（内部测试）</small>
+        </button>
+        
+        <button class="menu-btn secondary" onclick="goTasks()">
+          我的 KPI
+          <small>查看任务、提交成果、同步日历</small>
+        </button>
+        
+        <button class="menu-btn admin hidden" id="adminBtn" onclick="goAdmin()">
+          管理后台
+          <small>分配 KPI、查看对话记录（仅管理员）</small>
+        </button>
+        
+        <button class="btn" onclick="logout()" style="margin-top: 20px; background: #666;">退出登录</button>
       </div>
-      
-      <div class="form-group">
-        <label for="grade">当前学段（选填）</label>
-        <select id="grade">
-          <option value="">请选择</option>
-          <option value="小学">小学</option>
-          <option value="初中">初中</option>
-          <option value="高中">高中</option>
-          <option value="大学">大学</option>
-          <option value="其他">其他</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label for="interest">感兴趣的话题（选填）</label>
-        <input type="text" id="interest" placeholder="例如：诗词、历史、写作" maxlength="20">
-      </div>
-
-      <button class="btn-primary" onclick="register()">开始对话</button>
-      
-      <p class="privacy">信息仅存储于本地浏览器，不会上传服务器</p>
-    </div>
-
-    <div class="card hidden" id="welcomeCard">
-      <h2>注册成功</h2>
-      <p id="welcomeText"></p>
-      <button class="btn-primary" onclick="goChat()">进入对话</button>
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script>
+    const TEAM_API = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com"; // teamApi 地址
+    let token = localStorage.getItem("xinghuan_token");
+    let userRole = localStorage.getItem("xinghuan_role");
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      event.target.classList.add('active');
+      document.getElementById('loginForm').classList.toggle('hidden', tab !== 'login');
+      document.getElementById('registerForm').classList.toggle('hidden', tab !== 'register');
+      document.getElementById('loginError').style.display = 'none';
+      document.getElementById('regError').style.display = 'none';
+    }
+
+    async function api(action, data) {
+      const res = await fetch(TEAM_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, data, token })
+      });
+      return await res.json();
+    }
+
+    async function login() {
+      const r = await api("login", {
+        username: document.getElementById("loginUsername").value,
+        password: document.getElementById("loginPassword").value
+      });
+      if (r.error) { 
+        document.getElementById("loginError").textContent = r.error;
+        document.getElementById("loginError").style.display = "block";
+        return; 
+      }
+      
+      token = r.token;
+      userRole = r.role;
+      localStorage.setItem("xinghuan_token", token);
+      localStorage.setItem("xinghuan_role", userRole);
+      localStorage.setItem("xinghuan_name", r.name);
+      
+      showMenu(r.name, r.role);
+    }
+
+    async function register() {
+      const r = await api("register", {
+        username: document.getElementById("regUsername").value,
+        password: document.getElementById("regPassword").value,
+        invite_code: document.getElementById("regInvite").value
+      });
+      if (r.error) { 
+        document.getElementById("regError").textContent = r.error;
+        document.getElementById("regError").style.display = "block";
+        return; 
+      }
+      
+      token = r.token;
+      userRole = r.role;
+      localStorage.setItem("xinghuan_token", token);
+      localStorage.setItem("xinghuan_role", userRole);
+      localStorage.setItem("xinghuan_name", r.name);
+      
+      showMenu(r.name, r.role);
+    }
+
+    function showMenu(name, role) {
+      document.getElementById("authSection").classList.add("hidden");
+      document.getElementById("menuSection").classList.remove("hidden");
+      document.getElementById("userInfo").textContent = `${name} | 星环终端`;
+      
+      if (role === "admin") {
+        document.getElementById("adminBtn").classList.remove("hidden");
+      }
+    }
+
+    function goChat() {
+      window.location.href = "chat.html";
+    }
+
+    function goTasks() {
+      alert("KPI 功能请访问 member.html 查看（或联系管理员）");
+      // 或者如果你把 KPI 功能也合并到 member.html 了，改成 window.location.href = "member.html";
+    }
+
+    function goAdmin() {
+      window.location.href = "admin.html";
+    }
+
+    function logout() {
+      localStorage.clear();
+      location.reload();
+    }
+
+    // 自动登录
+    if (token) {
+      api("my_tasks", {}).then(r => {
+        if (!r.error) {
+          const name = localStorage.getItem("xinghuan_name") || "成员";
+          showMenu(name, userRole);
+        } else {
+          localStorage.clear();
+        }
+      });
+    }
+  </script>
 </body>
 </html>
