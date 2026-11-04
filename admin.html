@@ -23,7 +23,7 @@
     .member-dept { font-size: 12px; color: #666; }
     .hidden { display: none !important; }
     .chat-record { border-bottom: 1px solid #eee; padding: 12px 0; }
-    /* 【修改】苏轼回复的问答块样式 */
+    /* 苏轼回复的问答块样式 */
     .chat-record-answer {
       background: #f0f4ff;
       border-radius: 8px;
@@ -139,7 +139,8 @@
   </div>
 
   <script>
-    const API = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com"; // teamApi 地址
+    // ★★★ 唯一要改的地方：必须和 member.html 里的 TEAM_API 一模一样 ★★★
+    const API = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com";
     let token = localStorage.getItem("xinghuan_token");
 
     async function api(action, data) {
@@ -208,7 +209,7 @@
       document.getElementById("taskDesc").value = "";
     }
 
-    // 【修改】调用 teamApi 获取对话记录，问答成对显示
+    // 调用 teamApi 获取对话记录，问答成对显示
     async function loadChatHistory() {
       const username = document.getElementById("chatUserSelect").value;
       const list = document.getElementById("chatHistoryList");
@@ -241,13 +242,11 @@
           </div>
         `;
 
-        // 【修改】区分"问"和"答"渲染：苏轼的回复用独立样式块显示
+        // 区分"问"和"答"渲染：苏轼的回复用独立样式块显示
         let historyHtml = r.history.slice().reverse().map(h => {
-          // 时间戳兜底：旧数据或失败记录可能没有时间
           const timeStr = h.timestamp ? new Date(h.timestamp).toLocaleString() : "时间未知";
 
           if (h.role === "assistant") {
-            // 苏轼的答
             return `
               <div class="chat-record-answer">
                 <div class="chat-meta">${timeStr} | 苏轼</div>
@@ -256,7 +255,6 @@
             `;
           }
 
-          // 玩家的问（行为数据兜底，防止 hesitationScore 缺失显示 NaN）
           const hesit = (h.behavior && h.behavior.hesitationScore != null)
             ? (h.behavior.hesitationScore * 100).toFixed(0) + "%"
             : "未知";
