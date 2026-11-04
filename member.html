@@ -3,56 +3,42 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>星环终端 - 成员工作台</title>
+  <title>星环终端 - 工作台</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f5f5; color: #333; }
-    .container { max-width: 500px; margin: 0 auto; padding: 20px; }
-    .header { background: #1F2A44; color: white; padding: 20px; text-align: center; border-radius: 0 0 12px 12px; }
+    .header { background: #1F2A44; color: white; padding: 20px; text-align: center; }
     .header h1 { font-size: 20px; margin-bottom: 4px; }
     .header p { font-size: 13px; opacity: 0.8; }
-    .card { background: white; border-radius: 12px; padding: 20px; margin-top: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-    .card h2 { font-size: 16px; margin-bottom: 16px; color: #1F2A44; }
+    .container { max-width: 500px; margin: 0 auto; padding: 20px; }
+    .card { background: white; border-radius: 12px; padding: 24px; margin-top: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .menu-btn { display: block; width: 100%; padding: 20px; margin-bottom: 16px; background: #1F2A44; color: white; border: none; border-radius: 12px; font-size: 18px; cursor: pointer; text-align: left; transition: all 0.3s; }
+    .menu-btn:hover { background: #2a3a5c; transform: translateY(-2px); }
+    .menu-btn.secondary { background: #0066cc; }
+    .menu-btn.secondary:hover { background: #0052a3; }
+    .menu-btn.admin { background: #dc3545; }
+    .menu-btn.admin:hover { background: #b02a37; }
+    .menu-btn small { display: block; font-size: 13px; opacity: 0.8; margin-top: 4px; }
     .form-group { margin-bottom: 14px; }
     .form-group label { display: block; font-size: 13px; color: #666; margin-bottom: 6px; }
-    .form-group input, .form-group select, .form-group textarea {
-      width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px;
-    }
-    .btn { width: 100%; padding: 14px; background: #1F2A44; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin-top: 8px; }
-    .btn:hover { background: #2a3a5c; }
-    .btn-secondary { background: #0066cc; }
-    .btn-secondary:hover { background: #0052a3; }
-    .task-card { background: white; border-left: 4px solid #0066cc; padding: 16px; margin-bottom: 12px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
-    .task-card.p0 { border-left-color: #dc3545; }
-    .task-card.p1 { border-left-color: #ffc107; }
-    .task-title { font-weight: bold; font-size: 15px; margin-bottom: 6px; }
-    .task-meta { font-size: 12px; color: #666; display: flex; justify-content: space-between; }
-    .task-status { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-top: 8px; }
-    .status-pending { background: #fff3cd; color: #856404; }
-    .status-submitted { background: #d4edda; color: #155724; }
-    .status-overdue { background: #f8d7da; color: #721c24; }
-    .hidden { display: none !important; }
-    .empty { text-align: center; color: #999; padding: 40px 0; }
+    .form-group input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; }
+    .btn { width: 100%; padding: 14px; background: #1F2A44; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
     .tabs { display: flex; border-bottom: 2px solid #eee; margin-bottom: 16px; }
     .tab { flex: 1; text-align: center; padding: 12px; cursor: pointer; color: #666; border-bottom: 2px solid transparent; margin-bottom: -2px; }
     .tab.active { color: #1F2A44; border-bottom-color: #1F2A44; font-weight: bold; }
-    .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; }
-    .modal-content { background: white; border-radius: 12px; padding: 24px; width: 90%; max-width: 400px; }
-    .modal h3 { margin-bottom: 16px; font-size: 18px; }
-    .close { float: right; font-size: 24px; cursor: pointer; color: #999; }
-    .deadline-badge { font-size: 11px; color: #dc3545; font-weight: bold; }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
   <div class="header">
     <h1>星环终端</h1>
-    <p id="userInfo">成员工作台</p>
+    <p id="userInfo">团队工作台</p>
   </div>
 
   <div class="container">
-    <!-- 登录/注册 -->
-    <div id="authSection" class="card">
-      <h2>登录 / 注册</h2>
+    <!-- 登录界面 -->
+    <div id="loginSection" class="card">
+      <h2 style="margin-bottom: 16px; color: #1F2A44;">成员登录</h2>
       <div class="tabs">
         <div class="tab active" onclick="switchTab('login')">登录</div>
         <div class="tab" onclick="switchTab('register')">首次注册</div>
@@ -70,9 +56,9 @@
         <button class="btn" onclick="login()">登录</button>
       </div>
 
-      <div id="registerForm" style="display:none;">
+      <div id="registerForm" class="hidden">
         <div class="form-group">
-          <label>邀请码（向组长索取）</label>
+          <label>邀请码</label>
           <input type="text" id="regInvite" placeholder="如：xh001">
         </div>
         <div class="form-group">
@@ -83,49 +69,49 @@
           <label>设置密码</label>
           <input type="password" id="regPassword" placeholder="密码">
         </div>
-        <button class="btn btn-secondary" onclick="register()">注册并登录</button>
+        <button class="btn" onclick="register()">注册并登录</button>
       </div>
     </div>
 
-    <!-- 任务列表 -->
-    <div id="taskSection" style="display:none;">
+    <!-- 功能菜单（登录后显示） -->
+    <div id="menuSection" class="hidden">
       <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-          <h2 style="margin:0;">我的 KPI</h2>
-          <button class="btn btn-secondary" style="width:auto; padding:8px 16px; font-size:13px;" onclick="downloadICS()">订阅日历</button>
-        </div>
-        <div id="taskList"></div>
+        <h2 style="margin-bottom: 20px; color: #1F2A44;">选择功能</h2>
+        
+        <button class="menu-btn" onclick="goChat()">
+          与苏轼对话
+          <small>AI 历史角色互动（内部测试）</small>
+        </button>
+        
+        <button class="menu-btn secondary" onclick="goTasks()">
+          我的 KPI
+          <small>查看任务、提交成果、同步日历</small>
+        </button>
+        
+        <button class="menu-btn admin hidden" id="adminBtn" onclick="goAdmin()">
+          管理后台
+          <small>分配 KPI、查看对话记录（仅管理员）</small>
+        </button>
+        
+        <button class="btn" onclick="logout()" style="margin-top: 20px; background: #666;">退出登录</button>
       </div>
-    </div>
-  </div>
-
-  <!-- 提交弹窗 -->
-  <div id="submitModal" class="modal" style="display:none;">
-    <div class="modal-content">
-      <span class="close" onclick="closeModal()">&times;</span>
-      <h3>提交任务</h3>
-      <input type="hidden" id="submitTaskId">
-      <div class="form-group">
-        <label>完成说明 / 链接</label>
-        <textarea id="submitContent" rows="4" placeholder="描述完成情况，或粘贴文件链接"></textarea>
-      </div>
-      <button class="btn" onclick="doSubmit()">确认提交</button>
     </div>
   </div>
 
   <script>
-    const API = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com";
+    const TEAM_API = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com"; // teamApi 地址
     let token = localStorage.getItem("xinghuan_token");
+    let userRole = localStorage.getItem("xinghuan_role");
 
     function switchTab(tab) {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       event.target.classList.add('active');
-      document.getElementById('loginForm').style.display = tab === 'login' ? 'block' : 'none';
-      document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
+      document.getElementById('loginForm').classList.toggle('hidden', tab !== 'login');
+      document.getElementById('registerForm').classList.toggle('hidden', tab !== 'register');
     }
 
     async function api(action, data) {
-      const res = await fetch(API, {
+      const res = await fetch(TEAM_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, data, token })
@@ -139,10 +125,14 @@
         password: document.getElementById("loginPassword").value
       });
       if (r.error) { alert(r.error); return; }
+      
       token = r.token;
+      userRole = r.role;
       localStorage.setItem("xinghuan_token", token);
+      localStorage.setItem("xinghuan_role", userRole);
       localStorage.setItem("xinghuan_name", r.name);
-      showTasks(r.name);
+      
+      showMenu(r.name, r.role);
     }
 
     async function register() {
@@ -152,86 +142,54 @@
         invite_code: document.getElementById("regInvite").value
       });
       if (r.error) { alert(r.error); return; }
+      
       token = r.token;
+      userRole = r.role;
       localStorage.setItem("xinghuan_token", token);
+      localStorage.setItem("xinghuan_role", userRole);
       localStorage.setItem("xinghuan_name", r.name);
-      showTasks(r.name);
+      
+      showMenu(r.name, r.role);
     }
 
-    async function showTasks(name) {
-      document.getElementById("authSection").style.display = "none";
-      document.getElementById("taskSection").style.display = "block";
-      document.getElementById("userInfo").textContent = name + " | 星环终端";
+    function showMenu(name, role) {
+      document.getElementById("loginSection").classList.add("hidden");
+      document.getElementById("menuSection").classList.remove("hidden");
+      document.getElementById("userInfo").textContent = `${name} | 星环终端`;
       
-      const r = await api("my_tasks", {});
-      const list = document.getElementById("taskList");
-      
-      if (!r.tasks || !r.tasks.length) {
-        list.innerHTML = '<div class="empty">暂无 KPI 任务</div>';
-        return;
+      // 只有管理员显示后台按钮
+      if (role === "admin") {
+        document.getElementById("adminBtn").classList.remove("hidden");
       }
-
-      list.innerHTML = r.tasks.map(t => {
-        const deadline = new Date(t.deadline);
-        const days = Math.ceil((deadline - new Date()) / (1000*60*60*24));
-        const isOverdue = days < 0 && t.status !== "approved";
-        const statusClass = t.status === "submitted" ? "status-submitted" : (isOverdue ? "status-overdue" : "status-pending");
-        const statusText = t.status === "submitted" ? "已提交" : (isOverdue ? "已逾期" : "进行中");
-        
-        return `
-          <div class="task-card ${t.priority.toLowerCase()}">
-            <div class="task-title">${t.title}</div>
-            <div class="task-meta">
-              <span>截止：${deadline.toLocaleDateString()}</span>
-              <span class="deadline-badge">${isOverdue ? "逾期" + Math.abs(days) + "天" : "剩余" + days + "天"}</span>
-            </div>
-            <div style="margin-top:8px; font-size:12px; color:#666;">${t.description || ""}</div>
-            <span class="task-status ${statusClass}">${statusText}</span>
-            ${t.status === "pending" ? `<button class="btn btn-secondary" style="margin-top:12px; padding:10px;" onclick="openSubmit('${t.id}')">提交完成</button>` : ""}
-          </div>
-        `;
-      }).join("");
     }
 
-    function openSubmit(taskId) {
-      document.getElementById("submitTaskId").value = taskId;
-      document.getElementById("submitModal").style.display = "flex";
+    function goChat() {
+      // 跳转到 chat.html，带上 token 作为参数（或存 localStorage 让 chat.html 读取）
+      window.location.href = "chat.html";
     }
 
-    function closeModal() {
-      document.getElementById("submitModal").style.display = "none";
+    function goTasks() {
+      alert("KPI 功能开发中，请稍后在 admin.html 查看（或刷新页面）");
+      // 或者跳转到原来的 member.html 任务列表，但这里已经合并了
     }
 
-    async function doSubmit() {
-      const r = await api("submit_task", {
-        task_id: document.getElementById("submitTaskId").value,
-        content: document.getElementById("submitContent").value
-      });
-      if (r.error) { alert(r.error); return; }
-      closeModal();
-      alert("提交成功");
+    function goAdmin() {
+      window.location.href = "admin.html";
+    }
+
+    function logout() {
+      localStorage.clear();
       location.reload();
     }
 
-    async function downloadICS() {
-      const r = await api("get_ics", {});
-      const blob = new Blob([r.ics_content], { type: "text/calendar" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "xinghuan-kpi.ics";
-      a.click();
-      alert("已下载日历文件，请用手机日历打开订阅");
-    }
-
-    // 自动登录检测
+    // 自动登录
     if (token) {
       api("my_tasks", {}).then(r => {
         if (!r.error) {
           const name = localStorage.getItem("xinghuan_name") || "成员";
-          showTasks(name);
+          showMenu(name, userRole);
         } else {
-          localStorage.removeItem("xinghuan_token");
+          localStorage.clear();
         }
       });
     }
