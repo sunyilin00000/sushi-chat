@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>历史角色互动 - 用户注册</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>历史角色互动</h1>
+      <p class="subtitle">与苏轼的对话之旅</p>
+    </div>
+
+    <div class="card" id="registerCard">
+      <h2>首次使用，请完善信息</h2>
+      <p class="desc">为了提供个性化的对话体验，请告诉我们你的称呼</p>
+      
+      <div class="form-group">
+        <label for="nickname">你的称呼</label>
+        <input type="text" id="nickname" placeholder="例如：小明、同学、子涵" maxlength="10">
+      </div>
+      
+      <div class="form-group">
+        <label for="grade">当前学段（选填）</label>
+        <select id="grade">
+          <option value="">请选择</option>
+          <option value="小学">小学</option>
+          <option value="初中">初中</option>
+          <option value="高中">高中</option>
+          <option value="大学">大学</option>
+          <option value="其他">其他</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="interest">感兴趣的话题（选填）</label>
+        <input type="text" id="interest" placeholder="例如：诗词、历史、写作" maxlength="20">
+      </div>
+
+      <button class="btn-primary" onclick="register()">开始对话</button>
+      
+      <p class="privacy">信息仅存储于本地浏览器，不会上传服务器</p>
+    </div>
+
+    <div class="card hidden" id="welcomeCard">
+      <h2>注册成功</h2>
+      <p id="welcomeText"></p>
+      <button class="btn-primary" onclick="goChat()">进入对话</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
