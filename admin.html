@@ -23,9 +23,17 @@
     .member-dept { font-size: 12px; color: #666; }
     .hidden { display: none !important; }
     .chat-record { border-bottom: 1px solid #eee; padding: 12px 0; }
+    /* 【修改】苏轼回复的问答块样式 */
+    .chat-record-answer {
+      background: #f0f4ff;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin: 6px 0;
+      border-left: 3px solid #1F2A44;
+    }
     .chat-meta { color: #666; font-size: 12px; margin-bottom: 6px; }
     .chat-q { margin: 6px 0; }
-    .chat-a { color: #1F2A44; }
+    .chat-a { color: #1F2A44; line-height: 1.6; white-space: pre-wrap; }
     .profile-bar { margin-bottom: 12px; }
     .profile-bar-header { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
     .profile-bar-track { background: #e0e0e0; height: 8px; border-radius: 4px; overflow: hidden; }
@@ -149,11 +157,11 @@
         password: document.getElementById("password").value
       });
       if (r.error) { alert(r.error); return; }
-      if (r.role !== "admin") { 
-        alert("非管理员账号"); 
+      if (r.role !== "admin") {
+        alert("非管理员账号");
         localStorage.removeItem("xinghuan_token");
         window.location.href = "member.html";
-        return; 
+        return;
       }
       token = r.token;
       localStorage.setItem("xinghuan_token", token);
@@ -163,13 +171,13 @@
     async function showAdmin() {
       document.getElementById("loginSection").style.display = "none";
       document.getElementById("adminSection").style.display = "block";
-      
+
       const r = await api("list_members", {});
       const select = document.getElementById("taskOwner");
       const list = document.getElementById("memberList");
       const chatSelect = document.getElementById("chatUserSelect");
       const profileSelect = document.getElementById("profileUserSelect");
-      
+
       select.innerHTML = r.members.map(m => `<option value="${m.username}">${m.name} (${m.department})</option>`).join("");
       list.innerHTML = r.members.map(m => `
         <div class="member-row">
@@ -180,9 +188,9 @@
           <div style="font-size:12px; color:#666;">${m.username}</div>
         </div>
       `).join("");
-      chatSelect.innerHTML = '<option value="">请选择成员</option>' + 
+      chatSelect.innerHTML = '<option value="">请选择成员</option>' +
         r.members.map(m => `<option value="${m.username}">${m.name}</option>`).join("");
-      profileSelect.innerHTML = '<option value="">请选择成员</option>' + 
+      profileSelect.innerHTML = '<option value="">请选择成员</option>' +
         r.members.map(m => `<option value="${m.username}">${m.name}</option>`).join("");
     }
 
@@ -200,82 +208,102 @@
       document.getElementById("taskDesc").value = "";
     }
 
-    // 修改：直接调用 teamApi 获取对话记录
+    // 【修改】调用 teamApi 获取对话记录，问答成对显示
     async function loadChatHistory() {
       const username = document.getElementById("chatUserSelect").value;
       const list = document.getElementById("chatHistoryList");
-      
+
       if (!username) {
         list.innerHTML = '<div class="loading">请选择成员查看对话记录</div>';
         return;
       }
-      
+
       list.innerHTML = '<div class="loading">加载中...</div>';
-      
+
       try {
         const r = await api("get_chat_history", { username });
         if (r.error) {
           list.innerHTML = `<div class="error-msg">${r.error}</div>`;
           return;
         }
-        
+
         if (!r.history || r.history.length === 0) {
           list.innerHTML = '<div class="loading">该成员暂无对话记录</div>';
           return;
         }
-        
-        // 显示统计信息
+
+        // 统计信息
         let statsHtml = `
           <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-size: 13px;">
-            <strong>会话统计：</strong> 第 ${r.session_count} 局 | 
-            当前执念值: ${r.current_obsession} | 
+            <strong>会话统计：</strong> 第 ${r.session_count} 局 |
+            当前执念值: ${r.current_obsession} |
             历史消息: ${r.history.length} 条
           </div>
         `;
-        
-        // 显示历史记录（倒序，最新的在前）
-        let historyHtml = r.history.slice().reverse().map(h => `
-          <div class="chat-record">
-            <div class="chat-meta">${new Date(h.timestamp).toLocaleString()} | 类型: ${h.type || 'normal'}</div>
-            <div class="chat-q"><strong>问：</strong>${escapeHtml(h.content)}</div>
-            ${h.behavior ? `<div style="font-size:12px;color:#999;margin:4px 0;">[行为: 犹豫${(h.behavior.hesitationScore*100).toFixed(0)}%, 删改${h.behavior.delete_count}次]</div>` : ''}
-          </div>
-        `).join("");
-        
+
+        // 【修改】区分"问"和"答"渲染：苏轼的回复用独立样式块显示
+        let historyHtml = r.history.slice().reverse().map(h => {
+          // 时间戳兜底：旧数据或失败记录可能没有时间
+          const timeStr = h.timestamp ? new Date(h.timestamp).toLocaleString() : "时间未知";
+
+          if (h.role === "assistant") {
+            // 苏轼的答
+            return `
+              <div class="chat-record-answer">
+                <div class="chat-meta">${timeStr} | 苏轼</div>
+                <div class="chat-a"><strong>答：</strong>${escapeHtml(h.content)}</div>
+              </div>
+            `;
+          }
+
+          // 玩家的问（行为数据兜底，防止 hesitationScore 缺失显示 NaN）
+          const hesit = (h.behavior && h.behavior.hesitationScore != null)
+            ? (h.behavior.hesitationScore * 100).toFixed(0) + "%"
+            : "未知";
+          const delCount = (h.behavior && h.behavior.delete_count != null) ? h.behavior.delete_count : "?";
+
+          return `
+            <div class="chat-record">
+              <div class="chat-meta">${timeStr} | 类型: ${h.type || 'normal'}</div>
+              <div class="chat-q"><strong>问：</strong>${escapeHtml(h.content)}</div>
+              <div style="font-size:12px;color:#999;margin:4px 0;">[行为: 犹豫${hesit}, 删改${delCount}次]</div>
+            </div>
+          `;
+        }).join("");
+
         list.innerHTML = statsHtml + historyHtml;
       } catch (err) {
         list.innerHTML = '<div class="error-msg">加载失败，请检查网络</div>';
       }
     }
 
-    // 修改：直接调用 teamApi 获取心理画像
     async function loadPsychProfile() {
       const username = document.getElementById("profileUserSelect").value;
       const display = document.getElementById("psychProfileDisplay");
-      
+
       if (!username) {
         display.innerHTML = '<div class="loading">请选择成员查看心理画像</div>';
         return;
       }
-      
+
       display.innerHTML = '<div class="loading">加载中...</div>';
-      
+
       try {
         const r = await api("get_psych_profile", { username });
         if (r.error) {
           display.innerHTML = `<div class="error-msg">${r.error}</div>`;
           return;
         }
-        
+
         if (!r.profile || !r.profile.dimensions) {
           display.innerHTML = '<div class="loading">该成员暂无画像数据（可能未进行对话或样本不足）</div>';
           return;
         }
-        
+
         const d = r.profile.dimensions;
         const confidence = r.profile.confidence || 0;
         const sampleCount = r.profile.sample_count || 0;
-        
+
         let tendency = "平衡型";
         let tendencyDesc = "互动风格较为均衡，无明显倾向";
         if (d.empathy > 0.6) {
@@ -291,14 +319,14 @@
           tendency = "控制型";
           tendencyDesc = "倾向于掌控对话节奏，反复测试规则";
         }
-        
+
         display.innerHTML = `
           <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
             <div style="display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 14px;">
               <span><strong>分析样本：</strong>${sampleCount} 轮对话</span>
               <span><strong>置信度：</strong>${(confidence * 100).toFixed(0)}%</span>
             </div>
-            
+
             <div class="profile-bar">
               <div class="profile-bar-header">
                 <span>共情倾向</span><span>${d.empathy.toFixed(2)}</span>
@@ -307,7 +335,7 @@
                 <div class="profile-bar-fill profile-empathy" style="width: ${d.empathy * 100}%"></div>
               </div>
             </div>
-            
+
             <div class="profile-bar">
               <div class="profile-bar-header">
                 <span>猎奇倾向</span><span>${d.curiosity.toFixed(2)}</span>
@@ -316,7 +344,7 @@
                 <div class="profile-bar-fill profile-curiosity" style="width: ${d.curiosity * 100}%"></div>
               </div>
             </div>
-            
+
             <div class="profile-bar">
               <div class="profile-bar-header">
                 <span>犹豫倾向</span><span>${d.hesitation.toFixed(2)}</span>
@@ -325,7 +353,7 @@
                 <div class="profile-bar-fill profile-hesitation" style="width: ${d.hesitation * 100}%"></div>
               </div>
             </div>
-            
+
             <div class="profile-bar">
               <div class="profile-bar-header">
                 <span>控制倾向</span><span>${d.control.toFixed(2)}</span>
@@ -334,7 +362,7 @@
                 <div class="profile-bar-fill profile-control" style="width: ${d.control * 100}%"></div>
               </div>
             </div>
-            
+
             <div class="profile-summary">
               <div style="margin-bottom: 8px;">
                 <span style="font-size: 13px; color: #666;">当前倾向：</span>
