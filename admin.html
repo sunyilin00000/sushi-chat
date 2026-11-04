@@ -22,13 +22,27 @@
     .member-name { font-weight: bold; }
     .member-dept { font-size: 12px; color: #666; }
     .hidden { display: none !important; }
-    /* 新增：对话记录样式 */
+    /* 对话记录样式 */
     .chat-record { border-bottom: 1px solid #eee; padding: 12px 0; }
     .chat-meta { color: #666; font-size: 12px; margin-bottom: 6px; }
     .chat-q { margin: 6px 0; }
     .chat-a { color: #1F2A44; }
     .chat-link { color: #0066cc; text-decoration: none; }
     .chat-link:hover { text-decoration: underline; }
+    /* 行为画像样式 */
+    .profile-bar { margin-bottom: 12px; }
+    .profile-bar-header { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+    .profile-bar-track { background: #e0e0e0; height: 8px; border-radius: 4px; overflow: hidden; }
+    .profile-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+    .profile-empathy { background: #28a745; }
+    .profile-curiosity { background: #dc3545; }
+    .profile-hesitation { background: #ffc107; }
+    .profile-control { background: #17a2b8; }
+    .profile-summary { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 15px; border-left: 4px solid #1F2A44; }
+    .profile-tendency { font-size: 18px; font-weight: bold; color: #1F2A44; }
+    .profile-note { font-size: 12px; color: #666; margin-top: 8px; line-height: 1.5; }
+    .loading { color: #999; text-align: center; padding: 20px; }
+    .error-msg { color: #dc3545; text-align: center; padding: 20px; }
   </style>
 </head>
 <body>
@@ -84,7 +98,6 @@
         <div id="memberList"></div>
       </div>
 
-      <!-- 新增：苏轼对话记录查看 -->
       <div class="card">
         <h2>苏轼对话记录（内部测试）</h2>
         <div class="form-group">
@@ -94,7 +107,29 @@
           </select>
         </div>
         <div id="chatHistoryList" style="max-height: 500px; overflow-y: auto;">
-          <div style="color: #999; text-align: center; padding: 20px;">请选择成员查看对话记录</div>
+          <div class="loading">请选择成员查看对话记录</div>
+        </div>
+      </div>
+
+      <!-- 新增：行为画像分析 -->
+      <div class="card">
+        <h2>玩家行为画像（心理分析）</h2>
+        <div class="form-group">
+          <label>选择成员查看画像</label>
+          <select id="profileUserSelect" onchange="loadPsychProfile()">
+            <option value="">请选择成员</option>
+          </select>
+        </div>
+        <div id="psychProfileDisplay">
+          <div class="loading">请选择成员查看心理画像</div>
+        </div>
+        <div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px; font-size: 13px; color: #666; line-height: 1.6;">
+          <strong>维度说明：</strong><br>
+          共情倾向：温情行为、承认恐惧、主动停手、犹豫时长<br>
+          猎奇倾向：语录要求、快速逼问、复制粘贴考据<br>
+          犹豫倾向：发送前停顿、删改频率、打开又关闭次数<br>
+          控制倾向：反复切换模式、撤回改写、连续追问<br>
+          <span style="color: #dc3545;">注意：画像仅驱动苏轼反应，不用于评判用户</span>
         </div>
       </div>
     </div>
@@ -138,6 +173,7 @@
       const select = document.getElementById("taskOwner");
       const list = document.getElementById("memberList");
       const chatSelect = document.getElementById("chatUserSelect");
+      const profileSelect = document.getElementById("profileUserSelect");
       
       // 填充任务分配下拉框
       select.innerHTML = r.members.map(m => `<option value="${m.username}">${m.name} (${m.department})</option>`).join("");
@@ -153,8 +189,12 @@
         </div>
       `).join("");
       
-      // 新增：填充对话记录下拉框
+      // 填充对话记录下拉框
       chatSelect.innerHTML = '<option value="">请选择成员</option>' + 
+        r.members.map(m => `<option value="${m.username}">${m.name}</option>`).join("");
+      
+      // 填充画像下拉框
+      profileSelect.innerHTML = '<option value="">请选择成员</option>' + 
         r.members.map(m => `<option value="${m.username}">${m.name}</option>`).join("");
     }
 
@@ -172,21 +212,18 @@
       document.getElementById("taskDesc").value = "";
     }
 
-    // 新增：加载对话记录
     async function loadChatHistory() {
       const username = document.getElementById("chatUserSelect").value;
       const list = document.getElementById("chatHistoryList");
       
       if (!username) {
-        list.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">请选择成员查看对话记录</div>';
+        list.innerHTML = '<div class="loading">请选择成员查看对话记录</div>';
         return;
       }
       
-      list.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">加载中...</div>';
+      list.innerHTML = '<div class="loading">加载中...</div>';
       
       try {
-        // 方案：直接引导去 GitHub 查看（因为 teamApi 没有 get_chat_history 接口）
-        // 或者你可以让 teamApi 加一个接口，这里先提供直接链接
         const githubUrl = `https://github.com/sunyilin00000/xinghuan-data/blob/main/data.json`;
         
         list.innerHTML = `
@@ -201,35 +238,137 @@
             </p>
           </div>
         `;
-        
-        // 如果 teamApi 后续加了 get_chat_history 接口，可以改成：
-        /*
-        const r = await api("get_chat_history", { username });
-        if (r.history && r.history.length > 0) {
-          list.innerHTML = r.history.slice().reverse().map(h => `
-            <div class="chat-record">
-              <div class="chat-meta">${new Date(h.time).toLocaleString()} | ${h.name} | ${h.length_tier || 'medium'}</div>
-              <div class="chat-q"><strong>问：</strong>${escapeHtml(h.question)}</div>
-              <div class="chat-a"><strong>答：</strong>${escapeHtml(h.reply)}</div>
-            </div>
-          `).join("");
-        } else {
-          list.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">该成员暂无对话记录</div>';
-        }
-        */
       } catch (err) {
-        list.innerHTML = '<div style="color: red; text-align: center; padding: 20px;">加载失败，请稍后重试</div>';
+        list.innerHTML = '<div class="error-msg">加载失败，请稍后重试</div>';
       }
     }
 
-    // 工具函数
+    // 加载心理画像
+    async function loadPsychProfile() {
+      const username = document.getElementById("profileUserSelect").value;
+      const display = document.getElementById("psychProfileDisplay");
+      
+      if (!username) {
+        display.innerHTML = '<div class="loading">请选择成员查看心理画像</div>';
+        return;
+      }
+      
+      display.innerHTML = '<div class="loading">加载中...</div>';
+      
+      try {
+        // 从 GitHub 读取 data.json 中的 psych_profiles
+        const githubToken = prompt("请输入 GitHub Token 以读取数据（仅管理员可见）：");
+        if (!githubToken) {
+          display.innerHTML = '<div class="error-msg">需要 GitHub Token 才能读取画像数据</div>';
+          return;
+        }
+        
+        const response = await fetch(`https://api.github.com/repos/sunyilin00000/xinghuan-data/contents/data.json`, {
+          headers: { "Authorization": "token " + githubToken }
+        });
+        
+        if (!response.ok) throw new Error("读取失败，请检查 Token 权限");
+        
+        const data = await response.json();
+        const content = JSON.parse(atob(data.content));
+        const profile = content.psych_profiles && content.psych_profiles[username];
+        
+        if (!profile || !profile.dimensions) {
+          display.innerHTML = '<div class="loading">该成员暂无画像数据（可能未进行对话或样本不足）</div>';
+          return;
+        }
+        
+        const d = profile.dimensions;
+        const confidence = profile.confidence || 0;
+        const sampleCount = profile.sample_count || 0;
+        
+        // 计算倾向描述
+        let tendency = "平衡型";
+        let tendencyDesc = "互动风格较为均衡，无明显倾向";
+        if (d.empathy > 0.6) {
+          tendency = "共情型";
+          tendencyDesc = "倾向于温情互动，会犹豫并尊重苏轼的边界";
+        } else if (d.curiosity > 0.6) {
+          tendency = "猎奇型";
+          tendencyDesc = "倾向于探索边界，快速逼问，可能将苏轼视为观察对象";
+        } else if (d.hesitation > 0.6) {
+          tendency = "犹豫型";
+          tendencyDesc = "表达谨慎，多次删改，在意苏轼的反应";
+        } else if (d.control > 0.6) {
+          tendency = "控制型";
+          tendencyDesc = "倾向于掌控对话节奏，反复测试规则";
+        }
+        
+        display.innerHTML = `
+          <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 14px;">
+              <span><strong>分析样本：</strong>${sampleCount} 轮对话</span>
+              <span><strong>置信度：</strong>${(confidence * 100).toFixed(0)}%</span>
+            </div>
+            
+            <div class="profile-bar">
+              <div class="profile-bar-header">
+                <span>共情倾向</span><span>${d.empathy.toFixed(2)}</span>
+              </div>
+              <div class="profile-bar-track">
+                <div class="profile-bar-fill profile-empathy" style="width: ${d.empathy * 100}%"></div>
+              </div>
+            </div>
+            
+            <div class="profile-bar">
+              <div class="profile-bar-header">
+                <span>猎奇倾向</span><span>${d.curiosity.toFixed(2)}</span>
+              </div>
+              <div class="profile-bar-track">
+                <div class="profile-bar-fill profile-curiosity" style="width: ${d.curiosity * 100}%"></div>
+              </div>
+            </div>
+            
+            <div class="profile-bar">
+              <div class="profile-bar-header">
+                <span>犹豫倾向</span><span>${d.hesitation.toFixed(2)}</span>
+              </div>
+              <div class="profile-bar-track">
+                <div class="profile-bar-fill profile-hesitation" style="width: ${d.hesitation * 100}%"></div>
+              </div>
+            </div>
+            
+            <div class="profile-bar">
+              <div class="profile-bar-header">
+                <span>控制倾向</span><span>${d.control.toFixed(2)}</span>
+              </div>
+              <div class="profile-bar-track">
+                <div class="profile-bar-fill profile-control" style="width: ${d.control * 100}%"></div>
+              </div>
+            </div>
+            
+            <div class="profile-summary">
+              <div style="margin-bottom: 8px;">
+                <span style="font-size: 13px; color: #666;">当前倾向：</span>
+                <span class="profile-tendency">${tendency}</span>
+              </div>
+              <div style="font-size: 14px; color: #333; margin-bottom: 10px;">
+                ${tendencyDesc}
+              </div>
+              <div class="profile-note">
+                该画像驱动苏轼的初始态度基线和分支解锁，仅用于优化互动体验，不代表对用户的评判。
+                数据每局衰减 30%，避免早期行为过度影响后续判断。
+              </div>
+            </div>
+          </div>
+        `;
+      } catch (err) {
+        display.innerHTML = `<div class="error-msg">加载失败：${err.message}</div>`;
+      }
+    }
+
     function escapeHtml(text) {
       const div = document.createElement("div");
       div.textContent = text;
       return div.innerHTML;
     }
 
-    // 自动登录检测（非管理员踢回）
+    // 自动登录检测
     if (token) {
       api("list_members", {}).then(r => {
         if (!r.error) {
