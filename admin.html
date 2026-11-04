@@ -17,10 +17,18 @@
       width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px;
     }
     .btn { width: 100%; padding: 14px; background: #1F2A44; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
+    .btn:hover { background: #2a3a5c; }
     .member-row { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; }
     .member-name { font-weight: bold; }
     .member-dept { font-size: 12px; color: #666; }
     .hidden { display: none !important; }
+    /* 新增：对话记录样式 */
+    .chat-record { border-bottom: 1px solid #eee; padding: 12px 0; }
+    .chat-meta { color: #666; font-size: 12px; margin-bottom: 6px; }
+    .chat-q { margin: 6px 0; }
+    .chat-a { color: #1F2A44; }
+    .chat-link { color: #0066cc; text-decoration: none; }
+    .chat-link:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -75,11 +83,25 @@
         <h2>团队成员</h2>
         <div id="memberList"></div>
       </div>
+
+      <!-- 新增：苏轼对话记录查看 -->
+      <div class="card">
+        <h2>苏轼对话记录（内部测试）</h2>
+        <div class="form-group">
+          <label>选择成员查看记录</label>
+          <select id="chatUserSelect" onchange="loadChatHistory()">
+            <option value="">请选择成员</option>
+          </select>
+        </div>
+        <div id="chatHistoryList" style="max-height: 500px; overflow-y: auto;">
+          <div style="color: #999; text-align: center; padding: 20px;">请选择成员查看对话记录</div>
+        </div>
+      </div>
     </div>
   </div>
 
   <script>
-    const API = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com";
+    const API = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com"; // teamApi 地址
     let token = localStorage.getItem("xinghuan_token");
 
     async function api(action, data) {
@@ -97,15 +119,12 @@
         password: document.getElementById("password").value
       });
       if (r.error) { alert(r.error); return; }
-      
-      // 关键：立即检查 role，不是 admin 就赶走
       if (r.role !== "admin") { 
-        alert("非管理员账号，无权访问后台"); 
+        alert("非管理员账号"); 
         localStorage.removeItem("xinghuan_token");
-        window.location.href = "member.html"; // 强制跳回成员页
+        window.location.href = "member.html";
         return; 
       }
-      
       token = r.token;
       localStorage.setItem("xinghuan_token", token);
       showAdmin();
@@ -118,8 +137,12 @@
       const r = await api("list_members", {});
       const select = document.getElementById("taskOwner");
       const list = document.getElementById("memberList");
+      const chatSelect = document.getElementById("chatUserSelect");
       
+      // 填充任务分配下拉框
       select.innerHTML = r.members.map(m => `<option value="${m.username}">${m.name} (${m.department})</option>`).join("");
+      
+      // 填充成员列表
       list.innerHTML = r.members.map(m => `
         <div class="member-row">
           <div>
@@ -129,6 +152,10 @@
           <div style="font-size:12px; color:#666;">${m.username}</div>
         </div>
       `).join("");
+      
+      // 新增：填充对话记录下拉框
+      chatSelect.innerHTML = '<option value="">请选择成员</option>' + 
+        r.members.map(m => `<option value="${m.username}">${m.name}</option>`).join("");
     }
 
     async function assignTask() {
@@ -142,15 +169,72 @@
       if (r.error) { alert(r.error); return; }
       alert("分配成功");
       document.getElementById("taskTitle").value = "";
+      document.getElementById("taskDesc").value = "";
     }
 
-    // 自动登录检测（已修复：非管理员强制跳转）
+    // 新增：加载对话记录
+    async function loadChatHistory() {
+      const username = document.getElementById("chatUserSelect").value;
+      const list = document.getElementById("chatHistoryList");
+      
+      if (!username) {
+        list.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">请选择成员查看对话记录</div>';
+        return;
+      }
+      
+      list.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">加载中...</div>';
+      
+      try {
+        // 方案：直接引导去 GitHub 查看（因为 teamApi 没有 get_chat_history 接口）
+        // 或者你可以让 teamApi 加一个接口，这里先提供直接链接
+        const githubUrl = `https://github.com/sunyilin00000/xinghuan-data/blob/main/data.json`;
+        
+        list.innerHTML = `
+          <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+            <p style="margin-bottom: 10px;"><strong>查看方式：</strong></p>
+            <p style="margin-bottom: 10px;">由于数据存储在 GitHub 私有仓库，请直接访问以下链接查看 <code>chat_history.${username}</code> 字段：</p>
+            <a href="${githubUrl}" target="_blank" class="chat-link" style="display: inline-block; padding: 8px 16px; background: #1F2A44; color: white; border-radius: 6px; text-decoration: none; margin-top: 8px;">
+              前往 GitHub 查看数据
+            </a>
+            <p style="margin-top: 15px; color: #666; font-size: 12px;">
+              提示：在 GitHub 页面中搜索 "${username}" 可快速定位该成员的对话记录
+            </p>
+          </div>
+        `;
+        
+        // 如果 teamApi 后续加了 get_chat_history 接口，可以改成：
+        /*
+        const r = await api("get_chat_history", { username });
+        if (r.history && r.history.length > 0) {
+          list.innerHTML = r.history.slice().reverse().map(h => `
+            <div class="chat-record">
+              <div class="chat-meta">${new Date(h.time).toLocaleString()} | ${h.name} | ${h.length_tier || 'medium'}</div>
+              <div class="chat-q"><strong>问：</strong>${escapeHtml(h.question)}</div>
+              <div class="chat-a"><strong>答：</strong>${escapeHtml(h.reply)}</div>
+            </div>
+          `).join("");
+        } else {
+          list.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">该成员暂无对话记录</div>';
+        }
+        */
+      } catch (err) {
+        list.innerHTML = '<div style="color: red; text-align: center; padding: 20px;">加载失败，请稍后重试</div>';
+      }
+    }
+
+    // 工具函数
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // 自动登录检测（非管理员踢回）
     if (token) {
       api("list_members", {}).then(r => {
         if (!r.error) {
           showAdmin();
         } else {
-          // 不是管理员或 token 失效，滚回成员页
           localStorage.removeItem("xinghuan_token");
           window.location.href = "member.html";
         }
