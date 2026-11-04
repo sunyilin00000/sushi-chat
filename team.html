@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>星环终端 - 团队 KPI 看板</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f5f5; }
+    .header { background: #1F2A44; color: white; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; }
+    .header h1 { font-size: 18px; }
+    .header button { background: rgba(255,255,255,0.15); color: white; border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+    .container { max-width: 640px; margin: 0 auto; padding: 16px; }
+    /* 成员卡片 */
+    .member-card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .member-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .member-name { font-weight: bold; font-size: 16px; color: #1F2A44; }
+    .member-dept { font-size: 12px; color: #888; margin-left: 8px; }
+    .member-total { font-size: 13px; color: #666; }
+    /* 总进度条 */
+    .total-track { background: #eee; height: 10px; border-radius: 5px; overflow: hidden; margin-bottom: 12px; }
+    .total-fill { height: 100%; border-radius: 5px; transition: width 0.4s; }
+    /* 单条任务 */
+    .task-row { padding: 8px 0; border-top: 1px solid #f0f0f0; }
+    .task-title { font-size: 14px; color: #333; margin-bottom: 4px; display: flex; justify-content: space-between; }
+    .task-deadline { font-size: 12px; color: #999; }
+    .task-deadline.overdue { color: #dc3545; font-weight: bold; }
+    .task-track { background: #f0f0f0; height: 6px; border-radius: 3px; overflow: hidden; margin-top: 4px; }
+    .task-fill { height: 100%; border-radius: 3px; }
+    .empty { color: #999; text-align: center; padding: 12px; font-size: 13px; }
+    .loading { color: #999; text-align: center; padding: 40px; }
+    .dept-group { margin: 18px 0 8px; font-size: 13px; color: #888; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📊 团队 KPI 看板</h1>
+    <button onclick="location.href='member.html'">返回工作台</button>
+  </div>
+  <div class="container" id="board">
+    <div class="loading">加载中...</div>
+  </div>
+
+  <script>
+    // ★★★ 和 member.html 里一模一样的 teamApi 地址 ★★★
+    const TEAM_API = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com";
+    const token = localStorage.getItem("xinghuan_token");
+
+    // 状态 → 进度百分比 + 显示文字
+    const STATUS_MAP = {
+      pending:   { percent: 0,   label: "待办",     color: "#dc3545" },
+      submitted: { percent: 50,  label: "待审核",   color: "#ffc107" },
+      approved:  { percent: 100, label: "已完成",   color: "#28a745" }
+    };
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    async function loadBoard() {
+      if (!token) { location.href = "member.html"; return; }
+
+      const res = await fetch(TEAM_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "team_progress", data: {}, token })
+      });
+      const r = await res.json();
+
+      if (r.error) { alert(r.error); location.href = "member.html"; return; }
+
+      const board = document.getElementById("board");
+      if (!r.members || r.members.length === 0) {
+        board.innerHTML = '<div class="loading">暂无成员数据</div>';
+        return;
+      }
+
+      // 按部门分组展示
+      const byDept = {};
+      r.members.forEach(m => {
+        if (!byDept[m.department]) byDept[m.department] = [];
+        byDept[m.department].push(m);
+      });
+
+      let html = "";
+      const now = new Date();
+
+      Object.keys(byDept).forEach(dept => {
+        html += `<div class="dept-group">── ${escapeHtml(dept)} ──</div>`;
+        byDept[dept].forEach(m => {
+          // 个人总进度 = 所有任务百分比的平均值；没任务算 100%
+          let totalPercent = 100;
+          if (m.tasks.length > 0) {
+            const sum = m.tasks.reduce((acc, t) => acc + (STATUS_MAP[t.status] || STATUS_MAP.pending).percent, 0);
+            totalPercent = Math.round(sum / m.tasks.length);
+          }
+          const doneCount = m.tasks.filter(t => t.status === "approved").length;
+
+          // 单个成员卡片
+          html += `
+            <div class="member-card">
+              <div class="member-head">
+                <div><span class="member-name">${escapeHtml(m.name)}</span><span class="member-dept">${escapeHtml(m.username)}</span></div>
+                <div class="member-total">${doneCount}/${m.tasks.length} 完成 · 总进度 ${totalPercent}%</div>
+              </div>
+              <div class="total-track">
+                <div class="total-fill" style="width:${totalPercent}%; background:${totalPercent === 100 ? "#28a745" : "#1F2A44"}"></div>
+              </div>
+          `;
+
+          // 任务列表
+          if (m.tasks.length === 0) {
+            html += '<div class="empty">暂无任务</div>';
+          } else {
+            m.tasks.forEach(t => {
+              const s = STATUS_MAP[t.status] || STATUS_MAP.pending;
+              const overdue = new Date(t.deadline) < now && t.status !== "approved";
+              const deadlineText = overdue
+                ? `已逾期 (${new Date(t.deadline).toLocaleDateString()})`
+                : new Date(t.deadline).toLocaleString();
+              html += `
+                <div class="task-row">
+                  <div class="task-title">
+                    <span>${escapeHtml(t.title)} <small style="color:#999">[${t.priority}]</small></span>
+                    <span style="color:${s.color}; font-size:12px">${s.label}</span>
+                  </div>
+                  <div class="task-deadline ${overdue ? "overdue" : ""}">截止：${deadlineText}</div>
+                  <div class="task-track">
+                    <div class="task-fill" style="width:${s.percent}%; background:${s.color}"></div>
+                  </div>
+                </div>
+              `;
+            });
+          }
+
+          html += '</div>';
+        });
+      });
+
+      board.innerHTML = html;
+    }
+
+    loadBoard();
+    // 每 60 秒自动刷新一次，看板数据保持新鲜
+    setInterval(loadBoard, 60000);
+  </script>
+</body>
+</html>
