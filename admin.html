@@ -23,7 +23,6 @@
     .member-dept { font-size: 12px; color: #666; }
     .hidden { display: none !important; }
     .chat-record { border-bottom: 1px solid #eee; padding: 12px 0; }
-    /* 苏轼回复的问答块样式 */
     .chat-record-answer {
       background: #f0f4ff;
       border-radius: 8px;
@@ -31,6 +30,17 @@
       margin: 6px 0;
       border-left: 3px solid #1F2A44;
     }
+    .impression-book {
+      background: #fff8e6;
+      border: 1px solid #f0e0b0;
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 15px;
+    }
+    .impression-book h3 { font-size: 14px; color: #8a6d1d; margin-bottom: 10px; }
+    .impression-item { font-size: 13px; color: #6b5a2a; padding: 5px 0; border-top: 1px dashed #e8d9a8; line-height: 1.5; }
+    .impression-item:first-of-type { border-top: none; }
+    .impression-empty { font-size: 13px; color: #b0a070; }
     .chat-meta { color: #666; font-size: 12px; margin-bottom: 6px; }
     .chat-q { margin: 6px 0; }
     .chat-a { color: #1F2A44; line-height: 1.6; white-space: pre-wrap; }
@@ -139,7 +149,7 @@
   </div>
 
   <script>
-    // ★★★ 唯一要改的地方：必须和 member.html 里的 TEAM_API 一模一样 ★★★
+    // ★★★ teamApi 访问地址（保持你上次改好的，别动）★★★
     const API = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com";
     let token = localStorage.getItem("xinghuan_token");
 
@@ -209,7 +219,6 @@
       document.getElementById("taskDesc").value = "";
     }
 
-    // 调用 teamApi 获取对话记录，问答成对显示
     async function loadChatHistory() {
       const username = document.getElementById("chatUserSelect").value;
       const list = document.getElementById("chatHistoryList");
@@ -228,28 +237,45 @@
           return;
         }
 
+        // 印象簿区块
+        let bookHtml = "";
+        if (r.impressions && r.impressions.length > 0) {
+          bookHtml = `
+            <div class="impression-book">
+              <h3>📖 苏轼的印象簿（${r.impressions.length} 条旧忆 · 第 ${r.session_count} 局 · 累计 ${r.total_rounds || 0} 轮）</h3>
+              ${r.impressions.map(s => `<div class="impression-item">${escapeHtml(s)}</div>`).join("")}
+            </div>
+          `;
+        } else {
+          bookHtml = `
+            <div class="impression-book">
+              <h3>📖 苏轼的印象簿</h3>
+              <div class="impression-empty">尚无旧忆——苏轼还未记住这个人。</div>
+            </div>
+          `;
+        }
+
         if (!r.history || r.history.length === 0) {
-          list.innerHTML = '<div class="loading">该成员暂无对话记录</div>';
+          list.innerHTML = bookHtml + '<div class="loading">该成员本局暂无对话</div>';
           return;
         }
 
-        // 统计信息
         let statsHtml = `
           <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-size: 13px;">
             <strong>会话统计：</strong> 第 ${r.session_count} 局 |
             当前执念值: ${r.current_obsession} |
-            历史消息: ${r.history.length} 条
+            本局消息: ${r.history.length} 条
           </div>
         `;
 
-        // 区分"问"和"答"渲染：苏轼的回复用独立样式块显示
         let historyHtml = r.history.slice().reverse().map(h => {
           const timeStr = h.timestamp ? new Date(h.timestamp).toLocaleString() : "时间未知";
 
           if (h.role === "assistant") {
+            const tag = h.proactive ? " | 苏轼主动搭话" : " | 苏轼";
             return `
               <div class="chat-record-answer">
-                <div class="chat-meta">${timeStr} | 苏轼</div>
+                <div class="chat-meta">${timeStr}${tag}</div>
                 <div class="chat-a"><strong>答：</strong>${escapeHtml(h.content)}</div>
               </div>
             `;
@@ -269,7 +295,7 @@
           `;
         }).join("");
 
-        list.innerHTML = statsHtml + historyHtml;
+        list.innerHTML = bookHtml + statsHtml + historyHtml;
       } catch (err) {
         list.innerHTML = '<div class="error-msg">加载失败，请检查网络</div>';
       }
