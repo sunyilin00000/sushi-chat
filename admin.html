@@ -20,7 +20,7 @@
     .member-row { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; }
     .member-name { font-weight: bold; }
     .member-dept { font-size: 12px; color: #666; }
-    .hidden { display: none; }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
@@ -42,7 +42,7 @@
       <button class="btn" onclick="login()">登录</button>
     </div>
 
-    <div id="adminSection" class="hidden">
+    <div id="adminSection" style="display:none;">
       <div class="card">
         <h2>分配新 KPI</h2>
         <div class="form-group">
@@ -104,8 +104,8 @@
     }
 
     async function showAdmin() {
-      document.getElementById("loginSection").classList.add("hidden");
-      document.getElementById("adminSection").classList.remove("hidden");
+      document.getElementById("loginSection").style.display = "none";
+      document.getElementById("adminSection").style.display = "block";
       
       const r = await api("list_members", {});
       const select = document.getElementById("taskOwner");
