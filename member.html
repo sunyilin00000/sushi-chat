@@ -59,7 +59,11 @@
       <div id="registerForm" class="hidden">
         <div class="form-group">
           <label>邀请码</label>
-          <input type="text" id="regInvite" placeholder="如：xh001">
+          <input type="text" id="regInvite" placeholder="团队码 xh001 / 测试码 test001">
+        </div>
+        <div class="form-group">
+          <label>显示名（选填，测试账号填写）</label>
+          <input type="text" id="regDisplayName" placeholder="例如：小明同学">
         </div>
         <div class="form-group">
           <label>设置账号</label>
@@ -88,6 +92,12 @@
           <small>查看任务、提交成果、同步日历</small>
         </button>
         
+        <!-- 【新增】一键复制 KPI 日历订阅链接 -->
+        <button class="menu-btn" style="background:#2e7d32;" onclick="copyCalendarLink()">
+          📅 订阅 KPI 每日提醒
+          <small>点我复制链接，粘贴到手机/电脑日历 App，每天自动提醒</small>
+        </button>
+        
         <button class="menu-btn admin hidden" id="adminBtn" onclick="goAdmin()">
           管理后台
           <small>分配 KPI、查看对话记录（仅管理员）</small>
@@ -99,8 +109,7 @@
   </div>
 
   <script>
-    // ★★★ 唯一要改的地方：把下面的地址换成 teamApi 的访问路径 ★★★
-    // 找法：SCF 控制台 → teamApi → 函数详情页顶部的"访问路径"
+    // ★★★ teamApi 访问地址（保持你上次改好的，别动）★★★
     const TEAM_API = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com";
     let token = localStorage.getItem("xinghuan_token");
     let userRole = localStorage.getItem("xinghuan_role");
@@ -141,7 +150,8 @@
       const r = await api("register", {
         username: document.getElementById("regUsername").value,
         password: document.getElementById("regPassword").value,
-        invite_code: document.getElementById("regInvite").value
+        invite_code: document.getElementById("regInvite").value,
+        display_name: document.getElementById("regDisplayName").value
       });
       if (r.error) { alert(r.error); return; }
       
@@ -159,7 +169,6 @@
       document.getElementById("menuSection").classList.remove("hidden");
       document.getElementById("userInfo").textContent = `${name} | 星环终端`;
       
-      // 只有管理员显示后台按钮
       if (role === "admin") {
         document.getElementById("adminBtn").classList.remove("hidden");
       }
@@ -175,6 +184,21 @@
 
     function goAdmin() {
       window.location.href = "admin.html";
+    }
+
+    // 【新增】复制日历订阅链接：GET teamApi地址/?token=当前登录token
+    // 把链接粘贴到日历 App 的"订阅日历"里，之后日历会定期自动拉取最新 KPI
+    async function copyCalendarLink() {
+      token = localStorage.getItem("xinghuan_token");
+      if (!token) { alert("请先登录"); return; }
+      const link = TEAM_API + "/?token=" + token;
+      try {
+        await navigator.clipboard.writeText(link);
+        alert("订阅链接已复制！\n\n粘贴到手机/电脑日历 App 的"订阅日历"里即可。\n\n注意：每次重新登录后需要重新复制一次。");
+      } catch (e) {
+        // 剪贴板 API 失败（部分浏览器要 https + 用户手势），退化为弹窗显示手动复制
+        prompt("复制下面的链接，粘贴到日历 App 里订阅：", link);
+      }
     }
 
     function logout() {
