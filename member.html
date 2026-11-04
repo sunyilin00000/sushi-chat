@@ -99,7 +99,9 @@
   </div>
 
   <script>
-    const TEAM_API = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com"; // teamApi 地址
+    // ★★★ 唯一要改的地方：把下面的地址换成 teamApi 的访问路径 ★★★
+    // 找法：SCF 控制台 → teamApi → 函数详情页顶部的"访问路径"
+    const TEAM_API = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com";
     let token = localStorage.getItem("xinghuan_token");
     let userRole = localStorage.getItem("xinghuan_role");
 
@@ -164,13 +166,11 @@
     }
 
     function goChat() {
-      // 跳转到 chat.html，带上 token 作为参数（或存 localStorage 让 chat.html 读取）
       window.location.href = "chat.html";
     }
 
     function goTasks() {
       alert("KPI 功能开发中，请稍后在 admin.html 查看（或刷新页面）");
-      // 或者跳转到原来的 member.html 任务列表，但这里已经合并了
     }
 
     function goAdmin() {
