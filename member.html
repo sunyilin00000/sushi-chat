@@ -16,6 +16,8 @@
     .menu-btn:hover { background: #2a3a5c; transform: translateY(-2px); }
     .menu-btn.secondary { background: #0066cc; }
     .menu-btn.secondary:hover { background: #0052a3; }
+    .menu-btn.green { background: #2e7d32; }
+    .menu-btn.green:hover { background: #1b5e20; }
     .menu-btn.admin { background: #dc3545; }
     .menu-btn.admin:hover { background: #b02a37; }
     .menu-btn small { display: block; font-size: 13px; opacity: 0.8; margin-top: 4px; }
@@ -36,7 +38,6 @@
   </div>
 
   <div class="container">
-    <!-- 登录界面 -->
     <div id="loginSection" class="card">
       <h2 style="margin-bottom: 16px; color: #1F2A44;">成员登录</h2>
       <div class="tabs">
@@ -77,7 +78,6 @@
       </div>
     </div>
 
-    <!-- 功能菜单（登录后显示） -->
     <div id="menuSection" class="hidden">
       <div class="card">
         <h2 style="margin-bottom: 20px; color: #1F2A44;">选择功能</h2>
@@ -87,13 +87,18 @@
           <small>AI 历史角色互动（内部测试）</small>
         </button>
         
+        <!-- 团队看板入口：外部测试账号登录时由 JS 隐藏 -->
+        <button class="menu-btn" id="teamBoardBtn" style="background:#6a3fb5;" onclick="goTeamBoard()">
+          📊 团队 KPI 看板
+          <small>查看所有人的任务和完成进度</small>
+        </button>
+        
         <button class="menu-btn secondary" onclick="goTasks()">
           我的 KPI
           <small>查看任务、提交成果、同步日历</small>
         </button>
         
-        <!-- 【新增】一键复制 KPI 日历订阅链接 -->
-        <button class="menu-btn" style="background:#2e7d32;" onclick="copyCalendarLink()">
+        <button class="menu-btn green" onclick="copyCalendarLink()">
           📅 订阅 KPI 每日提醒
           <small>点我复制链接，粘贴到手机/电脑日历 App，每天自动提醒</small>
         </button>
@@ -113,6 +118,7 @@
     const TEAM_API = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com";
     let token = localStorage.getItem("xinghuan_token");
     let userRole = localStorage.getItem("xinghuan_role");
+    let userDept = localStorage.getItem("xinghuan_dept");   // 记录部门，用于内外隔离
 
     function switchTab(tab) {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -142,8 +148,9 @@
       localStorage.setItem("xinghuan_token", token);
       localStorage.setItem("xinghuan_role", userRole);
       localStorage.setItem("xinghuan_name", r.name);
+      localStorage.setItem("xinghuan_dept", r.department);
       
-      showMenu(r.name, r.role);
+      showMenu(r.name, r.role, r.department);
     }
 
     async function register() {
@@ -160,34 +167,30 @@
       localStorage.setItem("xinghuan_token", token);
       localStorage.setItem("xinghuan_role", userRole);
       localStorage.setItem("xinghuan_name", r.name);
+      localStorage.setItem("xinghuan_dept", r.department);
       
-      showMenu(r.name, r.role);
+      showMenu(r.name, r.role, r.department);
     }
 
-    function showMenu(name, role) {
+    function showMenu(name, role, dept) {
       document.getElementById("loginSection").classList.add("hidden");
       document.getElementById("menuSection").classList.remove("hidden");
       document.getElementById("userInfo").textContent = `${name} | 星环终端`;
       
+      // 内外隔离：外部测试账号不显示团队看板入口
+      if (dept === "外部测试") {
+        document.getElementById("teamBoardBtn").classList.add("hidden");
+      }
       if (role === "admin") {
         document.getElementById("adminBtn").classList.remove("hidden");
       }
     }
 
-    function goChat() {
-      window.location.href = "chat.html";
-    }
+    function goChat() { window.location.href = "chat.html"; }
+    function goTeamBoard() { window.location.href = "team.html"; }
+    function goTasks() { alert("KPI 功能开发中，请稍后在 admin.html 查看（或刷新页面）"); }
+    function goAdmin() { window.location.href = "admin.html"; }
 
-    function goTasks() {
-      alert("KPI 功能开发中，请稍后在 admin.html 查看（或刷新页面）");
-    }
-
-    function goAdmin() {
-      window.location.href = "admin.html";
-    }
-
-    // 【新增】复制日历订阅链接：GET teamApi地址/?token=当前登录token
-    // 把链接粘贴到日历 App 的"订阅日历"里，之后日历会定期自动拉取最新 KPI
     async function copyCalendarLink() {
       token = localStorage.getItem("xinghuan_token");
       if (!token) { alert("请先登录"); return; }
@@ -196,7 +199,6 @@
         await navigator.clipboard.writeText(link);
         alert("订阅链接已复制！\n\n粘贴到手机/电脑日历 App 的"订阅日历"里即可。\n\n注意：每次重新登录后需要重新复制一次。");
       } catch (e) {
-        // 剪贴板 API 失败（部分浏览器要 https + 用户手势），退化为弹窗显示手动复制
         prompt("复制下面的链接，粘贴到日历 App 里订阅：", link);
       }
     }
@@ -206,12 +208,12 @@
       location.reload();
     }
 
-    // 自动登录
     if (token) {
       api("my_tasks", {}).then(r => {
         if (!r.error) {
           const name = localStorage.getItem("xinghuan_name") || "成员";
-          showMenu(name, userRole);
+          const dept = localStorage.getItem("xinghuan_dept") || "";
+          showMenu(name, userRole, dept);
         } else {
           localStorage.clear();
         }
