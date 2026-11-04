@@ -97,7 +97,15 @@
         password: document.getElementById("password").value
       });
       if (r.error) { alert(r.error); return; }
-      if (r.role !== "admin") { alert("非管理员账号"); return; }
+      
+      // 关键：立即检查 role，不是 admin 就赶走
+      if (r.role !== "admin") { 
+        alert("非管理员账号，无权访问后台"); 
+        localStorage.removeItem("xinghuan_token");
+        window.location.href = "member.html"; // 强制跳回成员页
+        return; 
+      }
+      
       token = r.token;
       localStorage.setItem("xinghuan_token", token);
       showAdmin();
@@ -136,9 +144,16 @@
       document.getElementById("taskTitle").value = "";
     }
 
+    // 自动登录检测（已修复：非管理员强制跳转）
     if (token) {
       api("list_members", {}).then(r => {
-        if (!r.error) showAdmin();
+        if (!r.error) {
+          showAdmin();
+        } else {
+          // 不是管理员或 token 失效，滚回成员页
+          localStorage.removeItem("xinghuan_token");
+          window.location.href = "member.html";
+        }
       });
     }
   </script>
