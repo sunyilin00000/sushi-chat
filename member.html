@@ -31,7 +31,7 @@
     .status-pending { background: #fff3cd; color: #856404; }
     .status-submitted { background: #d4edda; color: #155724; }
     .status-overdue { background: #f8d7da; color: #721c24; }
-    .hidden { display: none; }
+    .hidden { display: none !important; }
     .empty { text-align: center; color: #999; padding: 40px 0; }
     .tabs { display: flex; border-bottom: 2px solid #eee; margin-bottom: 16px; }
     .tab { flex: 1; text-align: center; padding: 12px; cursor: pointer; color: #666; border-bottom: 2px solid transparent; margin-bottom: -2px; }
@@ -70,7 +70,7 @@
         <button class="btn" onclick="login()">登录</button>
       </div>
 
-      <div id="registerForm" class="hidden">
+      <div id="registerForm" style="display:none;">
         <div class="form-group">
           <label>邀请码（向组长索取）</label>
           <input type="text" id="regInvite" placeholder="如：xh001">
@@ -88,7 +88,7 @@
     </div>
 
     <!-- 任务列表 -->
-    <div id="taskSection" class="hidden">
+    <div id="taskSection" style="display:none;">
       <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
           <h2 style="margin:0;">我的 KPI</h2>
@@ -100,7 +100,7 @@
   </div>
 
   <!-- 提交弹窗 -->
-  <div id="submitModal" class="modal hidden">
+  <div id="submitModal" class="modal" style="display:none;">
     <div class="modal-content">
       <span class="close" onclick="closeModal()">&times;</span>
       <h3>提交任务</h3>
@@ -120,8 +120,8 @@
     function switchTab(tab) {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       event.target.classList.add('active');
-      document.getElementById('loginForm').classList.toggle('hidden', tab !== 'login');
-      document.getElementById('registerForm').classList.toggle('hidden', tab !== 'register');
+      document.getElementById('loginForm').style.display = tab === 'login' ? 'block' : 'none';
+      document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
     }
 
     async function api(action, data) {
@@ -141,6 +141,7 @@
       if (r.error) { alert(r.error); return; }
       token = r.token;
       localStorage.setItem("xinghuan_token", token);
+      localStorage.setItem("xinghuan_name", r.name);
       showTasks(r.name);
     }
 
@@ -153,12 +154,13 @@
       if (r.error) { alert(r.error); return; }
       token = r.token;
       localStorage.setItem("xinghuan_token", token);
+      localStorage.setItem("xinghuan_name", r.name);
       showTasks(r.name);
     }
 
     async function showTasks(name) {
-      document.getElementById("authSection").classList.add("hidden");
-      document.getElementById("taskSection").classList.remove("hidden");
+      document.getElementById("authSection").style.display = "none";
+      document.getElementById("taskSection").style.display = "block";
       document.getElementById("userInfo").textContent = name + " | 星环终端";
       
       const r = await api("my_tasks", {});
@@ -193,11 +195,11 @@
 
     function openSubmit(taskId) {
       document.getElementById("submitTaskId").value = taskId;
-      document.getElementById("submitModal").classList.remove("hidden");
+      document.getElementById("submitModal").style.display = "flex";
     }
 
     function closeModal() {
-      document.getElementById("submitModal").classList.add("hidden");
+      document.getElementById("submitModal").style.display = "none";
     }
 
     async function doSubmit() {
@@ -222,10 +224,15 @@
       alert("已下载日历文件，请用手机日历打开订阅");
     }
 
-    // 自动登录
+    // 自动登录检测
     if (token) {
       api("my_tasks", {}).then(r => {
-        if (!r.error) showTasks(localStorage.getItem("xinghuan_name") || "成员");
+        if (!r.error) {
+          const name = localStorage.getItem("xinghuan_name") || "成员";
+          showTasks(name);
+        } else {
+          localStorage.removeItem("xinghuan_token");
+        }
       });
     }
   </script>
