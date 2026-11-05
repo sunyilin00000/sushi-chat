@@ -6,9 +6,22 @@
     <title>星环终端 - 团队工作台</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --primary: #1e293b; --bg: #f1f5f9; --card-bg: #ffffff; --text: #334155; --text-light: #64748b; --border: #e2e8f0; --accent: #3b82f6; --danger: #ef4444; }
+        :root {
+            --primary: #1e293b;
+            --bg: #f1f5f9;
+            --card-bg: #ffffff;
+            --text: #334155;
+            --text-light: #64748b;
+            --border: #e2e8f0;
+            --accent: #3b82f6;
+            --danger: #ef4444;
+        }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: var(--bg); color: var(--text); }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+        }
         .header { background-color: var(--primary); color: white; padding: 20px 0; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 30px; }
         .header h1 { font-size: 24px; font-weight: bold; letter-spacing: 2px; margin-bottom: 5px; }
         .header p { font-size: 14px; color: #94a3b8; }
@@ -54,12 +67,13 @@
         .member-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: white; }
         .member-info h4 { font-size: 15px; margin-bottom: 4px; }
         .member-info p { font-size: 12px; color: var(--text-light); }
-        .member-actions { display: flex; gap: 8px; }
+        .member-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
         .btn-small { padding: 6px 10px; font-size: 12px; border: none; border-radius: 4px; cursor: pointer; color: white; }
         .btn-chat { background: #10b981; }
         .btn-psych { background: #8b5cf6; }
         .btn-edit { background: #f59e0b; }
         .btn-del { background: var(--danger); }
+        .btn-map { background: #3b82f6; }
         .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
         .modal-content { background: white; border-radius: 12px; width: 90%; max-width: 600px; max-height: 85vh; display: flex; flex-direction: column; }
         .modal-header { padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
@@ -97,23 +111,20 @@
             <div id="loginForm">
                 <div class="form-group"><label>账号</label><input type="text" id="loginUsername" placeholder="请输入账号" onkeydown="if(event.key==='Enter') handleLogin()"></div>
                 <div class="form-group"><label>密码</label><input type="password" id="loginPassword" placeholder="请输入密码" onkeydown="if(event.key==='Enter') handleLogin()"></div>
-                <button class="btn" onclick="handleLogin()">登录</button>
+                <button class="btn" onclick="handleLogin()">登录并授权定位</button>
                 <div id="loginError" class="error-msg"></div>
             </div>
             <div id="registerForm" class="hidden">
-                <div class="form-group"><label>邀请码</label><input type="text" id="regInviteCode" placeholder="如 xh001 或 test001"></div>
-                <div class="form-group"><label>显示名称</label><input type="text" id="regDisplayName" placeholder="你的名字（外部测试必填）"></div>
-                <div class="form-group"><label>账号</label><input type="text" id="regUsername" placeholder="自定义登录账号（英文/数字）"></div>
+                <div class="form-group"><label>邀请码 (无内部邀请码可留空)</label><input type="text" id="regInviteCode" placeholder="如 xh001"></div>
+                <div class="form-group"><label>显示名称</label><input type="text" id="regDisplayName" placeholder="你的名字"></div>
+                <div class="form-group"><label>账号</label><input type="text" id="regUsername" placeholder="自定义登录账号"></div>
                 <div class="form-group"><label>密码</label><input type="password" id="regPassword" placeholder="设置密码"></div>
                 <button class="btn" onclick="handleRegister()">注册并登录</button>
-                <button class="btn btn-outline" onclick="autoFillTestAccount()">一键生成外部测试账号</button>
                 <div id="regError" class="error-msg"></div>
             </div>
             <div class="guide-box">
-                <strong>外部测试人员提示：</strong><br>
-                1. 首次访问请点击上方“<strong>首次注册</strong>”。<br>
-                2. 邀请码请填写：<strong>test001</strong>、<strong>test002</strong> 或 <strong>test003</strong>。<br>
-                3. 请务必填写“显示名称”，并记住自定义的“账号”和“密码”。
+                <strong>安全提示：</strong><br>
+                为了团队协作安全，登录系统强制需要获取您的地理位置授权。
             </div>
         </div>
     </div>
@@ -146,7 +157,7 @@
                     <button class="btn btn-submit" onclick="submitAssignTask()">下发任务</button>
                 </div>
                 <div class="admin-section">
-                    <h3 style="margin-bottom: 15px; color: var(--primary);">成员数据分析</h3>
+                    <h3 style="margin-bottom: 15px; color: var(--primary);">成员数据与位置追踪</h3>
                     <div class="member-list" id="adminMemberList"><p style="text-align:center; color:var(--text-light);">加载中...</p></div>
                 </div>
             </div>
@@ -207,35 +218,74 @@
             document.getElementById('regError').innerText = '';
         }
 
-        function autoFillTestAccount() {
-            const randomId = Math.floor(Math.random() * 90000) + 10000;
-            document.getElementById('regInviteCode').value = "test001";
-            document.getElementById('regDisplayName').value = "外部测试_" + randomId;
-            document.getElementById('regUsername').value = "test_" + randomId;
-            document.getElementById('regPassword').value = "123456";
-            document.getElementById('regError').innerText = "已自动填入，请点击下方【注册并登录】";
-            document.getElementById('regError').style.color = "var(--accent)";
+        // ★ 核心新增：强制获取地理位置的函数
+        function getGeolocation() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject(new Error("您的浏览器不支持定位功能，无法登录。"));
+                    return;
+                }
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        resolve({ lat: position.coords.latitude, lng: position.coords.longitude });
+                    },
+                    (error) => {
+                        switch(error.code) {
+                            case error.PERMISSION_DENIED:
+                                reject(new Error("您拒绝了位置授权。必须允许定位才能登录。"));
+                                break;
+                            case error.POSITION_UNAVAILABLE:
+                                reject(new Error("位置信息不可用，请检查网络或 GPS。"));
+                                break;
+                            case error.TIMEOUT:
+                                reject(new Error("获取位置超时，请重试。"));
+                                break;
+                            default:
+                                reject(new Error("定位失败，无法登录。"));
+                                break;
+                        }
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+            });
         }
 
         async function handleLogin() {
-            const btn = event.target, errDiv = document.getElementById('loginError');
+            const btn = event.target;
+            const errDiv = document.getElementById('loginError');
             const usernameInput = document.getElementById('loginUsername').value.trim();
             const password = document.getElementById('loginPassword').value.trim();
+            
             if (!usernameInput || !password) { errDiv.innerText = "请输入账号和密码"; return; }
-            btn.innerText = "登录中..."; btn.disabled = true; errDiv.innerText = "";
+
+            btn.innerText = "获取定位中..."; 
+            btn.disabled = true; 
+            errDiv.innerText = "";
+
             try {
-                const resData = await apiCall('login', { username: usernameInput, password: password }, false);
+                // 1. 强制拦截获取位置
+                const loc = await getGeolocation();
+                
+                btn.innerText = "登录中...";
+                // 2. 携带经纬度发起登录请求
+                const resData = await apiCall('login', { 
+                    username: usernameInput, 
+                    password: password,
+                    lat: loc.lat,
+                    lng: loc.lng
+                }, false);
+                
                 if (!resData.token) throw new Error("登录成功，但后端未返回 token");
+
                 currentToken = resData.token;
                 currentUser = { username: usernameInput, name: resData.name || usernameInput, role: resData.role || 'member' };
+                
                 localStorage.setItem('xh_token', currentToken);
                 localStorage.setItem('xh_user', JSON.stringify(currentUser));
                 showMainView();
             } catch (err) {
-                if (err.message.includes("账号或密码错误")) {
-                    errDiv.innerHTML = "账号或密码错误。<br><span style='color:#64748b; font-size:12px;'>如果是首次使用，请点击上方【首次注册】。</span>";
-                } else { errDiv.innerText = err.message; }
-            } finally { btn.innerText = "登录"; btn.disabled = false; }
+                errDiv.innerText = err.message;
+            } finally { btn.innerText = "登录并授权定位"; btn.disabled = false; }
         }
 
         async function handleRegister() {
@@ -244,19 +294,31 @@
             const display_name = document.getElementById('regDisplayName').value.trim();
             const usernameInput = document.getElementById('regUsername').value.trim();
             const password = document.getElementById('regPassword').value.trim();
-            if (!invite_code || !usernameInput || !password) { errDiv.innerText = "请填写邀请码、账号和密码"; return; }
-            if (invite_code.startsWith("test") && !display_name) { errDiv.innerText = "外部测试人员请填写【显示名称】"; return; }
-            btn.innerText = "注册中..."; btn.disabled = true; errDiv.innerText = ""; errDiv.style.color = "#ef4444";
+
+            if (!usernameInput || !password) { errDiv.innerText = "请填写账号和密码"; return; }
+
+            btn.innerText = "获取定位中..."; btn.disabled = true; errDiv.innerText = ""; errDiv.style.color = "#ef4444";
+
             try {
-                const resData = await apiCall('register', { invite_code, display_name, username: usernameInput, password }, false);
+                const loc = await getGeolocation();
+                btn.innerText = "注册中...";
+                
+                const resData = await apiCall('register', { 
+                    invite_code, display_name, username: usernameInput, password,
+                    lat: loc.lat, lng: loc.lng
+                }, false);
+                
                 if (!resData.token) throw new Error("注册成功，但后端未返回 token");
+
                 currentToken = resData.token;
                 currentUser = { username: usernameInput, name: resData.name || display_name || usernameInput, role: resData.role || 'member' };
+                
                 localStorage.setItem('xh_token', currentToken);
                 localStorage.setItem('xh_user', JSON.stringify(currentUser));
                 showMainView();
-            } catch (err) { errDiv.innerText = err.message; }
-            finally { btn.innerText = "注册并登录"; btn.disabled = false; }
+            } catch (err) {
+                errDiv.innerText = err.message;
+            } finally { btn.innerText = "注册并登录"; btn.disabled = false; }
         }
 
         function handleLogout() {
@@ -333,47 +395,68 @@
             const select = document.getElementById('assignOwner'); const list = document.getElementById('adminMemberList');
             select.innerHTML = '<option value="">加载中...</option>'; list.innerHTML = '<p style="text-align:center;">加载中...</p>';
             try {
-                const data = await apiCall('list_members', null, true); membersCache = data.members || [];
+                // 获取成员列表
+                const data = await apiCall('list_members', null, true); 
+                membersCache = data.members || [];
+                
+                // 这里为了演示，我们需要拉取每个成员的最近位置（实际应用中可能需要专门的批量接口，这里为了简单暂略）
+                
                 select.innerHTML = '<option value="">请选择成员...</option>';
-                membersCache.filter(m => m.department !== '外部测试').forEach(m => { select.innerHTML += `<option value="${m.username}">${m.name} (${m.department})</option>`; });
+                membersCache.forEach(m => { select.innerHTML += `<option value="${m.username}">${m.name} (${m.department})</option>`; });
+                
+                // 渲染列表
                 list.innerHTML = membersCache.map(m => `
                     <div class="member-item">
-                        <div class="member-info"><h4>${m.name || m.username} <span style="font-size:12px; color:var(--text-light);">(${m.role})</span></h4><p>${m.department} | 账号: ${m.username}</p></div>
+                        <div class="member-info"><h4>${m.name || m.username} <span style="font-size:12px; color:var(--text-light);">(${m.role})</span></h4><p>${m.department}</p></div>
                         <div class="member-actions">
                             <button class="btn-small btn-chat" onclick="viewChat('${m.username}', '${m.name}')">对话</button>
                             <button class="btn-small btn-psych" onclick="viewPsych('${m.username}', '${m.name}')">分析图</button>
-                            <button class="btn-small btn-edit" onclick="renameMember('${m.username}', '${m.name}')">改名</button>
-                            <button class="btn-small btn-del" onclick="deleteMember('${m.username}', '${m.name}')">删除</button>
+                            <!-- 这里增加一个查看位置按钮 -->
+                            <button class="btn-small btn-map" onclick="viewLocation('${m.username}', '${m.name}')">定位</button>
                         </div>
                     </div>
                 `).join('');
             } catch (err) { select.innerHTML = '<option value="">加载失败</option>'; list.innerHTML = `<p class="error-msg">加载失败: ${err.message}</p>`; }
         }
 
-        // ===== 新增：改名功能 =====
-        async function renameMember(username, oldName) {
-            const newName = prompt(`请输入「${oldName}」的新名字：`, oldName);
-            if (!newName || newName.trim() === "" || newName === oldName) return;
+        // ★ 新增：查看成员定位
+        async function viewLocation(username, name) {
+            document.getElementById('modalTitle').innerText = `${name} 的最近位置`;
+            document.getElementById('modalBody').innerHTML = '<p style="text-align:center;">正在拉取位置数据...</p>';
+            document.getElementById('detailModal').classList.remove('hidden');
             
             try {
-                await apiCall('update_member', { target_username: username, new_name: newName.trim() }, true);
-                alert("改名成功！");
-                loadAdminData(); // 刷新列表
-            } catch (err) {
-                alert("改名失败: " + err.message);
-            }
-        }
+                // 从后端获取位置（我们在登录时存入了user.last_location，可以在这里拉取）
+                // 注意：由于list_members没返回位置，为了能直接看到，我们可以通过后端接口再拿
+                const data = await apiCall('get_user_tracks', { username }, true);
+                const tracks = data.tracks || [];
+                
+                if (tracks.length === 0) {
+                    document.getElementById('modalBody').innerHTML = '<p style="text-align:center; color:#64748b; padding:20px;">暂无定位记录。该成员可能未授权或近期未登录。</p>';
+                    return;
+                }
 
-        // ===== 新增：删除功能 =====
-        async function deleteMember(username, name) {
-            if (!confirm(`⚠️ 警告：确定要永久删除成员「${name}」吗？\n该操作将同时清空该成员所有的 KPI 任务、苏轼对话记录和心理画像，且不可恢复！`)) return;
-            
-            try {
-                await apiCall('delete_member', { target_username: username }, true);
-                alert("删除成功！");
-                loadAdminData();
+                const latest = tracks[tracks.length - 1]; // 最新的一条
+                let locHtml = `
+                    <div class="report-box">
+                        <h4>最新记录 (${new Date(latest.time).toLocaleString()})</h4>
+                        <p>IP 地址：${latest.ip || '未知'}</p>
+                `;
+                
+                if (latest.location) {
+                    locHtml += `
+                        <p>经纬度：${latest.location.lat.toFixed(6)}, ${latest.location.lng.toFixed(6)}</p>
+                        <a href="https://uri.amap.com/marker?position=${latest.location.lng},${latest.location.lat}&name=${name}" target="_blank" style="display:inline-block; margin-top:10px; padding:8px 15px; background:#3b82f6; color:white; text-decoration:none; border-radius:4px;">在高德地图中查看</a>
+                    `;
+                } else {
+                    locHtml += `<p>无 GPS 坐标</p>`;
+                }
+                locHtml += `</div>`;
+                
+                document.getElementById('modalBody').innerHTML = locHtml;
+
             } catch (err) {
-                alert("删除失败: " + err.message);
+                document.getElementById('modalBody').innerHTML = `<p style="color:red; text-align:center;">拉取失败: ${err.message}</p>`;
             }
         }
 
