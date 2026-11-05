@@ -1,213 +1,127 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>星环终端 - 团队工作台</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f5f5; color: #333; }
-    .header { background: #1F2A44; color: white; padding: 20px; text-align: center; border-radius: 0 0 12px 12px; }
-    .header h1 { font-size: 20px; margin-bottom: 4px; }
-    .header p { font-size: 13px; opacity: 0.8; }
-    .container { max-width: 500px; margin: 0 auto; padding: 20px; }
-    .card { background: white; border-radius: 12px; padding: 24px; margin-top: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-    .card h2 { font-size: 16px; margin-bottom: 16px; color: #1F2A44; }
-    .form-group { margin-bottom: 14px; }
-    .form-group label { display: block; font-size: 13px; color: #666; margin-bottom: 6px; }
-    .form-group input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; }
-    .btn { width: 100%; padding: 14px; background: #1F2A44; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; margin-top: 8px; }
-    .btn:hover { background: #2a3a5c; }
-    .btn-secondary { background: #0066cc; }
-    .btn-secondary:hover { background: #0052a3; }
-    .btn-admin { background: #dc3545; }
-    .btn-admin:hover { background: #b02a37; }
-    .menu-btn { display: block; width: 100%; padding: 20px; margin-bottom: 16px; border: none; border-radius: 12px; font-size: 18px; cursor: pointer; text-align: left; color: white; transition: all 0.3s; }
-    .menu-btn small { display: block; font-size: 13px; opacity: 0.8; margin-top: 4px; }
-    .menu-btn.primary { background: #1F2A44; }
-    .menu-btn.secondary { background: #0066cc; }
-    .menu-btn.admin { background: #dc3545; }
-    .tabs { display: flex; border-bottom: 2px solid #eee; margin-bottom: 16px; }
-    .tab { flex: 1; text-align: center; padding: 12px; cursor: pointer; color: #666; border-bottom: 2px solid transparent; margin-bottom: -2px; }
-    .tab.active { color: #1F2A44; border-bottom-color: #1F2A44; font-weight: bold; }
-    .hidden { display: none !important; }
-    .error-msg { color: #dc3545; font-size: 13px; margin-top: 8px; display: none; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星环终端 - 选择功能</title>
+    <style>
+        :root {
+            --primary: #1e293b;
+            --bg: #f1f5f9;
+            --card-bg: #ffffff;
+            --text: #334155;
+            --text-light: #64748b;
+            --blue: #0f62fe;
+            --red: #dc2626;
+            --gray: #52525b;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        /* 顶部深色导航 */
+        .header {
+            width: 100%;
+            background-color: var(--primary);
+            height: 60px;
+            margin-bottom: 40px;
+        }
+
+        .container {
+            background: var(--card-bg);
+            width: 90%;
+            max-width: 450px;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+        }
+
+        .title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #0f172a;
+        }
+
+        /* 按钮卡片样式 */
+        .menu-btn {
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            border: none;
+            transition: transform 0.1s, opacity 0.2s;
+            text-decoration: none;
+        }
+        .menu-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+        .menu-btn:active { transform: translateY(1px); }
+
+        .menu-btn h3 { font-size: 18px; margin-bottom: 5px; font-weight: bold; }
+        .menu-btn p { font-size: 13px; opacity: 0.8; }
+
+        /* 颜色区分 */
+        .btn-dark { background: var(--primary); color: white; }
+        .btn-blue { background: var(--blue); color: white; }
+        .btn-red { background: var(--red); color: white; }
+        .btn-gray { background: var(--gray); color: white; text-align: center; padding: 15px; }
+
+    </style>
 </head>
 <body>
-  <div class="header">
-    <h1>星环终端</h1>
-    <p id="userInfo">团队内部系统</p>
-  </div>
 
-  <div class="container">
-    <!-- 登录/注册 -->
-    <div id="authSection" class="card">
-      <h2>成员登录</h2>
-      <div class="tabs">
-        <div class="tab active" onclick="switchTab('login')">登录</div>
-        <div class="tab" onclick="switchTab('register')">首次注册</div>
-      </div>
-      
-      <div id="loginForm">
-        <div class="form-group">
-          <label>账号</label>
-          <input type="text" id="loginUsername" placeholder="用户名">
-        </div>
-        <div class="form-group">
-          <label>密码</label>
-          <input type="password" id="loginPassword" placeholder="密码">
-        </div>
-        <div class="error-msg" id="loginError">账号或密码错误</div>
-        <button class="btn" onclick="login()">登录</button>
-      </div>
+    <div class="header"></div>
 
-      <div id="registerForm" class="hidden">
-        <div class="form-group">
-          <label>邀请码（向组长索取）</label>
-          <input type="text" id="regInvite" placeholder="如：xh001">
-        </div>
-        <div class="form-group">
-          <label>设置账号</label>
-          <input type="text" id="regUsername" placeholder="用户名（英文）">
-        </div>
-        <div class="form-group">
-          <label>设置密码</label>
-          <input type="password" id="regPassword" placeholder="密码">
-        </div>
-        <div class="error-msg" id="regError">邀请码无效或账号已存在</div>
-        <button class="btn btn-secondary" onclick="register()">注册并登录</button>
-      </div>
+    <div class="container">
+        <div class="title">选择功能</div>
+        
+        <!-- 与苏轼对话 -->
+        <a href="chat.html" class="menu-btn btn-dark">
+            <h3>与苏轼对话</h3>
+            <p>AI 历史角色互动（内部测试）</p>
+        </a>
+
+        <!-- 我的 KPI -->
+        <a href="member.html" class="menu-btn btn-blue">
+            <h3>我的 KPI</h3>
+            <p>查看任务、提交成果、同步日历</p>
+        </a>
+
+        <!-- 管理后台 -->
+        <a href="admin.html" class="menu-btn btn-red">
+            <h3>管理后台</h3>
+            <p>分配 KPI、查看对话记录（仅管理员）</p>
+        </a>
+
+        <!-- 退出登录 -->
+        <button onclick="handleLogout()" class="menu-btn btn-gray">
+            退出登录
+        </button>
     </div>
 
-    <!-- 功能菜单 -->
-    <div id="menuSection" class="hidden">
-      <div class="card">
-        <h2 style="margin-bottom: 20px;">选择功能</h2>
-        
-        <button class="menu-btn primary" onclick="goChat()">
-          与苏轼对话
-          <small>AI 历史角色互动（内部测试）</small>
-        </button>
-        
-        <button class="menu-btn secondary" onclick="goTasks()">
-          我的 KPI
-          <small>查看任务、提交成果、同步日历</small>
-        </button>
-        
-        <button class="menu-btn admin hidden" id="adminBtn" onclick="goAdmin()">
-          管理后台
-          <small>分配 KPI、查看对话记录（仅管理员）</small>
-        </button>
-        
-        <button class="btn" onclick="logout()" style="margin-top: 20px; background: #666;">退出登录</button>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    const TEAM_API = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com"; // teamApi 地址
-    let token = localStorage.getItem("xinghuan_token");
-    let userRole = localStorage.getItem("xinghuan_role");
-
-    function switchTab(tab) {
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      event.target.classList.add('active');
-      document.getElementById('loginForm').classList.toggle('hidden', tab !== 'login');
-      document.getElementById('registerForm').classList.toggle('hidden', tab !== 'register');
-      document.getElementById('loginError').style.display = 'none';
-      document.getElementById('regError').style.display = 'none';
-    }
-
-    async function api(action, data) {
-      const res = await fetch(TEAM_API, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, data, token })
-      });
-      return await res.json();
-    }
-
-    async function login() {
-      const r = await api("login", {
-        username: document.getElementById("loginUsername").value,
-        password: document.getElementById("loginPassword").value
-      });
-      if (r.error) { 
-        document.getElementById("loginError").textContent = r.error;
-        document.getElementById("loginError").style.display = "block";
-        return; 
-      }
-      
-      token = r.token;
-      userRole = r.role;
-      localStorage.setItem("xinghuan_token", token);
-      localStorage.setItem("xinghuan_role", userRole);
-      localStorage.setItem("xinghuan_name", r.name);
-      
-      showMenu(r.name, r.role);
-    }
-
-    async function register() {
-      const r = await api("register", {
-        username: document.getElementById("regUsername").value,
-        password: document.getElementById("regPassword").value,
-        invite_code: document.getElementById("regInvite").value
-      });
-      if (r.error) { 
-        document.getElementById("regError").textContent = r.error;
-        document.getElementById("regError").style.display = "block";
-        return; 
-      }
-      
-      token = r.token;
-      userRole = r.role;
-      localStorage.setItem("xinghuan_token", token);
-      localStorage.setItem("xinghuan_role", userRole);
-      localStorage.setItem("xinghuan_name", r.name);
-      
-      showMenu(r.name, r.role);
-    }
-
-    function showMenu(name, role) {
-      document.getElementById("authSection").classList.add("hidden");
-      document.getElementById("menuSection").classList.remove("hidden");
-      document.getElementById("userInfo").textContent = `${name} | 星环终端`;
-      
-      if (role === "admin") {
-        document.getElementById("adminBtn").classList.remove("hidden");
-      }
-    }
-
-    function goChat() {
-      window.location.href = "chat.html";
-    }
-
-    function goTasks() {
-      alert("KPI 功能请访问 member.html 查看（或联系管理员）");
-      // 或者如果你把 KPI 功能也合并到 member.html 了，改成 window.location.href = "member.html";
-    }
-
-    function goAdmin() {
-      window.location.href = "admin.html";
-    }
-
-    function logout() {
-      localStorage.clear();
-      location.reload();
-    }
-
-    // 自动登录
-    if (token) {
-      api("my_tasks", {}).then(r => {
-        if (!r.error) {
-          const name = localStorage.getItem("xinghuan_name") || "成员";
-          showMenu(name, userRole);
-        } else {
-          localStorage.clear();
+    <script>
+        // 退出登录逻辑
+        function handleLogout() {
+            // 清除之前存储的登录状态（对应 member.html 里的 key）
+            localStorage.removeItem('xh_token');
+            localStorage.removeItem('xh_user');
+            
+            // 你可以选择跳回登录页，或者留在这里。这里给个提示并刷新
+            alert("已退出登录");
+            window.location.reload();
         }
-      });
-    }
-  </script>
+    </script>
 </body>
 </html>
