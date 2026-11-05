@@ -105,6 +105,21 @@
         }
         .btn:hover { opacity: 0.9; }
         .btn-submit { background: var(--accent); }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); margin-top: 10px; }
+        .btn-outline:hover { background: var(--bg); }
+
+        /* 提示框 */
+        .guide-box {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8fafc;
+            border: 1px dashed #cbd5e1;
+            border-radius: 8px;
+            font-size: 13px;
+            color: var(--text-light);
+            line-height: 1.6;
+        }
+        .guide-box strong { color: var(--accent); }
 
         /* 任务卡片 */
         .task-card {
@@ -190,19 +205,28 @@
                     <input type="text" id="regInviteCode" placeholder="如 xh001 或 test001">
                 </div>
                 <div class="form-group">
-                    <label>显示名称 (外部测试需填)</label>
-                    <input type="text" id="regDisplayName" placeholder="你的名字">
+                    <label>显示名称</label>
+                    <input type="text" id="regDisplayName" placeholder="你的名字（外部测试必填）">
                 </div>
                 <div class="form-group">
                     <label>账号</label>
-                    <input type="text" id="regUsername" placeholder="登录账号">
+                    <input type="text" id="regUsername" placeholder="自定义登录账号（英文/数字）">
                 </div>
                 <div class="form-group">
                     <label>密码</label>
                     <input type="password" id="regPassword" placeholder="设置密码">
                 </div>
                 <button class="btn" onclick="handleRegister()">注册并登录</button>
+                <button class="btn btn-outline" onclick="autoFillTestAccount()">一键生成外部测试账号</button>
                 <div id="regError" class="error-msg"></div>
+            </div>
+
+            <!-- 外部测试说明 -->
+            <div class="guide-box">
+                <strong>外部测试人员提示：</strong><br>
+                1. 首次访问请点击上方“<strong>首次注册</strong>”。<br>
+                2. 邀请码请填写：<strong>test001</strong>、<strong>test002</strong> 或 <strong>test003</strong>。<br>
+                3. 请务必填写“显示名称”，并记住自定义的“账号”和“密码”，之后用它们登录。
             </div>
         </div>
     </div>
@@ -232,7 +256,7 @@
 
     <script>
         // ==========================================
-        // ⚠️ 配置区：请务必替换为最新的 teamApi 地址
+        // ⚠️ 配置区：已填入你的真实地址
         // ==========================================
         const TEAM_API = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com"; 
 
@@ -259,7 +283,7 @@
             }
         };
 
-        // 统一请求封装 (严格按照后端期望的格式发送)
+        // 统一请求封装
         async function apiCall(action, dataParams, useToken = true) {
             try {
                 const body = { action };
@@ -298,6 +322,19 @@
                 document.getElementById('loginForm').classList.add('hidden');
                 document.getElementById('registerForm').classList.remove('hidden');
             }
+            document.getElementById('loginError').innerText = '';
+            document.getElementById('regError').innerText = '';
+        }
+
+        // 一键生成测试账号
+        function autoFillTestAccount() {
+            const randomId = Math.floor(Math.random() * 90000) + 10000;
+            document.getElementById('regInviteCode').value = "test001";
+            document.getElementById('regDisplayName').value = "外部测试_" + randomId;
+            document.getElementById('regUsername').value = "test_" + randomId;
+            document.getElementById('regPassword').value = "123456";
+            document.getElementById('regError').innerText = "已自动填入，请点击下方【注册并登录】";
+            document.getElementById('regError').style.color = "var(--accent)";
         }
 
         // 登录
@@ -317,7 +354,6 @@
             errDiv.innerText = "";
 
             try {
-                // 严格按照后端格式：{ action: 'login', data: { username, password } }
                 const resData = await apiCall('login', { username: usernameInput, password: password }, false);
                 
                 if (!resData.token) {
@@ -326,7 +362,7 @@
 
                 currentToken = resData.token;
                 currentUser = { 
-                    username: usernameInput, // 后端没返回 username，直接用输入的
+                    username: usernameInput, 
                     name: resData.name || usernameInput, 
                     role: resData.role || 'member' 
                 };
@@ -335,7 +371,11 @@
                 localStorage.setItem('xh_user', JSON.stringify(currentUser));
                 showMainView();
             } catch (err) {
-                errDiv.innerText = err.message;
+                if (err.message.includes("账号或密码错误")) {
+                    errDiv.innerHTML = "账号或密码错误。<br><span style='color:#64748b; font-size:12px;'>如果是首次使用，请点击上方【首次注册】。</span>";
+                } else {
+                    errDiv.innerText = err.message;
+                }
             } finally {
                 btn.innerText = "登录";
                 btn.disabled = false;
@@ -356,9 +396,15 @@
                 return;
             }
 
+            if (invite_code.startsWith("test") && !display_name) {
+                errDiv.innerText = "外部测试人员请填写【显示名称】";
+                return;
+            }
+
             btn.innerText = "注册中...";
             btn.disabled = true;
             errDiv.innerText = "";
+            errDiv.style.color = "#ef4444";
 
             try {
                 const resData = await apiCall('register', { 
@@ -435,12 +481,11 @@
             return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
         }
 
-        // 加载我的任务 (my_tasks)
+        // 加载我的任务
         async function loadMyTasks() {
             const list = document.getElementById('taskList');
             list.innerHTML = '<p style="text-align:center; color:var(--text-light);">加载中...</p>';
             try {
-                // 后端 my_tasks 不需要传额外 data，只靠 token 识别
                 const data = await apiCall('my_tasks', null, true);
                 const tasks = data.tasks || [];
                 if (tasks.length === 0) {
@@ -469,7 +514,7 @@
             }
         }
 
-        // 提交任务 (submit_task)
+        // 提交任务
         async function submitTask(taskId) {
             const input = document.getElementById(`sub_${taskId}`);
             const content = input.value.trim();
@@ -479,7 +524,6 @@
             }
             input.disabled = true;
             try {
-                // 严格按照后端格式传参
                 await apiCall('submit_task', { task_id: taskId, content: content }, true);
                 alert("提交成功！");
                 loadMyTasks();
@@ -489,7 +533,7 @@
             }
         }
 
-        // 加载团队进度 (team_progress)
+        // 加载团队进度
         async function loadTeamProgress() {
             const list = document.getElementById('teamList');
             list.innerHTML = '<p style="text-align:center; color:var(--text-light);">加载中...</p>';
@@ -503,7 +547,6 @@
                 }
 
                 list.innerHTML = members.map(m => {
-                    // 后端返回了每个人的 tasks 数组，前端自己算进度
                     const tasks = m.tasks || [];
                     const total = tasks.length;
                     const done = tasks.filter(t => t.status === 'approved').length;
