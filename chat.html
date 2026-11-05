@@ -52,13 +52,15 @@
   </div>
 
   <script>
-    // ===== API 地址 =====
-    // 已替换为你最新的真实 chatWithRole 地址
-    const API_BASE = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com";
-    // teamApi 地址
+    // ==========================================
+    // ★★★ 区分两个地址 ★★★
+    // ==========================================
+    // 1. chatWithRole 的地址（最早交接文档里的那个）
+    const API_BASE = "https://1502956590-kn3mzt8tfh.ap-nanjing.tencentscf.com";
+    
+    // 2. teamApi 的地址（你刚发的那个）
     const TEAM_API = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com";
 
-    // 修正：匹配 member.html 存的键名 xh_token
     const token = localStorage.getItem("xh_token");
     const userId = localStorage.getItem("xh_user") ? JSON.parse(localStorage.getItem("xh_user")).username : "guest";
 
@@ -70,7 +72,7 @@
     let focusBlurCount = 0;
 
     if (!token) {
-      alert("请先登录");
+      alert("请先前往 member.html 登录");
       location.href = "member.html";
     }
 
@@ -122,7 +124,7 @@
           return;
         }
       } catch (e) {
-        console.error("服务器历史拉取失败，退回本地缓存", e);
+        console.error("服务器历史拉取失败", e);
       }
       const raw = localStorage.getItem("chat_history_" + userId);
       if (raw) {
@@ -132,7 +134,7 @@
             addMessage(m.role, m.content);
             history.push(m);
           });
-        } catch (e) { /* 缓存损坏则忽略 */ }
+        } catch (e) { }
       }
     }
 
@@ -187,17 +189,18 @@
           })
         });
 
-        if (!response.ok) {
-          // 如果后端报错（比如 500），把后端的错误信息抓出来
-          let errMsg = `HTTP ${response.status}`;
-          try {
-            const errData = await response.json();
-            if (errData.error) errMsg = errData.error;
-          } catch(e) {}
-          throw new Error(errMsg);
+        if (response.status === 401) {
+          alert("登录已过期，请重新登录");
+          localStorage.removeItem("xh_token");
+          location.href = "member.html";
+          return;
         }
 
         const data = await response.json();
+
+        if (!response.ok) {
+           throw new Error(data.error || `请求失败(${response.status})`);
+        }
 
         if (data.state === "terminal") {
           document.getElementById("terminalStats").innerHTML = `
@@ -210,7 +213,7 @@
           saveHistory("assistant", "……");
           addMessage("assistant", "……");
         } else {
-          if (!data.reply) throw new Error("后端返回了空数据");
+          if (!data.reply) throw new Error("后端返回空数据");
           addMessage("assistant", data.reply, data.perception);
           saveHistory("assistant", data.reply);
           if (data.obsession !== undefined) {
