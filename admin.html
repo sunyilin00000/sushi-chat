@@ -1,428 +1,589 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>星环终端 - 管理员</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f5f5; }
-    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background: #1F2A44; color: white; padding: 20px; text-align: center; }
-    .card { background: white; border-radius: 12px; padding: 20px; margin-top: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-    .card h2 { font-size: 16px; margin-bottom: 16px; color: #1F2A44; }
-    .form-group { margin-bottom: 14px; }
-    .form-group label { display: block; font-size: 13px; color: #666; margin-bottom: 6px; }
-    .form-group input, .form-group select, .form-group textarea {
-      width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px;
-    }
-    .btn { width: 100%; padding: 14px; background: #1F2A44; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
-    .btn:hover { background: #2a3a5c; }
-    .member-row { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; }
-    .member-name { font-weight: bold; }
-    .member-dept { font-size: 12px; color: #666; }
-    .hidden { display: none !important; }
-    .chat-record { border-bottom: 1px solid #eee; padding: 12px 0; }
-    .chat-record-answer {
-      background: #f0f4ff;
-      border-radius: 8px;
-      padding: 10px 12px;
-      margin: 6px 0;
-      border-left: 3px solid #1F2A44;
-    }
-    .impression-book {
-      background: #fff8e6;
-      border: 1px solid #f0e0b0;
-      border-radius: 8px;
-      padding: 14px;
-      margin-bottom: 15px;
-    }
-    .impression-book h3 { font-size: 14px; color: #8a6d1d; margin-bottom: 10px; }
-    .impression-item { font-size: 13px; color: #6b5a2a; padding: 5px 0; border-top: 1px dashed #e8d9a8; line-height: 1.5; }
-    .impression-item:first-of-type { border-top: none; }
-    .impression-empty { font-size: 13px; color: #b0a070; }
-    .chat-meta { color: #666; font-size: 12px; margin-bottom: 6px; }
-    .chat-q { margin: 6px 0; }
-    .chat-a { color: #1F2A44; line-height: 1.6; white-space: pre-wrap; }
-    .profile-bar { margin-bottom: 12px; }
-    .profile-bar-header { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
-    .profile-bar-track { background: #e0e0e0; height: 8px; border-radius: 4px; overflow: hidden; }
-    .profile-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
-    .profile-empathy { background: #28a745; }
-    .profile-curiosity { background: #dc3545; }
-    .profile-hesitation { background: #ffc107; }
-    .profile-control { background: #17a2b8; }
-    .profile-summary { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 15px; border-left: 4px solid #1F2A44; }
-    .profile-tendency { font-size: 18px; font-weight: bold; color: #1F2A44; }
-    .profile-note { font-size: 12px; color: #666; margin-top: 8px; line-height: 1.5; }
-    .loading { color: #999; text-align: center; padding: 20px; }
-    .error-msg { color: #dc3545; text-align: center; padding: 20px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星环终端 - 团队工作台</title>
+    <style>
+        :root {
+            --primary: #1e293b;
+            --bg: #f1f5f9;
+            --card-bg: #ffffff;
+            --text: #334155;
+            --text-light: #64748b;
+            --border: #e2e8f0;
+            --accent: #3b82f6;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+        }
+        /* 顶部导航 */
+        .header {
+            background-color: var(--primary);
+            color: white;
+            padding: 20px 0;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .header h1 { font-size: 24px; font-weight: bold; letter-spacing: 2px; margin-bottom: 5px; }
+        .header p { font-size: 14px; color: #94a3b8; }
+        .nav-bar {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            background: white;
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+            margin-top: -30px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            border-radius: 0 0 8px 8px;
+        }
+        .nav-item {
+            padding: 8px 16px;
+            cursor: pointer;
+            font-weight: 500;
+            color: var(--text-light);
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .nav-item:hover { background: var(--bg); }
+        .nav-item.active { background: var(--primary); color: white; }
+        /* 管理员按钮特殊样式 */
+        .nav-item.admin-btn { color: #ef4444; font-weight: bold; margin-left: 20px; }
+        .nav-item.admin-btn:hover { background: #fee2e2; }
+        
+        .nav-item.logout { color: var(--text-light); margin-left: auto; }
+
+        /* 容器 */
+        .container { max-width: 800px; margin: 0 auto; padding: 0 15px 50px 15px; }
+
+        /* 登录/注册卡片 */
+        .auth-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        .tabs { display: flex; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .tab {
+            flex: 1;
+            text-align: center;
+            padding: 12px;
+            cursor: pointer;
+            color: var(--text-light);
+            font-weight: bold;
+        }
+        .tab.active { color: var(--primary); border-bottom: 2px solid var(--primary); }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-size: 14px; color: var(--text-light); }
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 16px;
+            outline: none;
+        }
+        .form-group input:focus { border-color: var(--accent); }
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .btn:hover { opacity: 0.9; }
+        .btn-submit { background: var(--accent); }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); margin-top: 10px; }
+        .btn-outline:hover { background: var(--bg); }
+
+        /* 提示框 */
+        .guide-box {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8fafc;
+            border: 1px dashed #cbd5e1;
+            border-radius: 8px;
+            font-size: 13px;
+            color: var(--text-light);
+            line-height: 1.6;
+        }
+        .guide-box strong { color: var(--accent); }
+
+        /* 任务卡片 */
+        .task-card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            border-left: 4px solid var(--accent);
+        }
+        .task-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .task-title { font-size: 18px; font-weight: bold; }
+        .task-priority { font-size: 12px; background: #fee2e2; color: #ef4444; padding: 2px 8px; border-radius: 12px; }
+        .task-meta { font-size: 13px; color: var(--text-light); margin-bottom: 15px; }
+        .task-desc { font-size: 14px; margin-bottom: 15px; line-height: 1.5; }
+        .task-status { font-size: 12px; background: #e2e8f0; color: #475569; padding: 4px 8px; border-radius: 4px; }
+        .task-status.submitted { background: #dbeafe; color: #2563eb; }
+        .task-status.approved { background: #dcfce7; color: #16a34a; }
+        .submit-area { display: flex; gap: 10px; margin-top: 10px; }
+        .submit-area input { flex: 1; padding: 8px; border: 1px solid var(--border); border-radius: 4px; }
+
+        /* 团队看板 */
+        .team-member {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .progress-bar-container {
+            width: 100%;
+            height: 10px;
+            background: var(--bg);
+            border-radius: 5px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background: var(--accent);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .hidden { display: none !important; }
+        .error-msg { color: #ef4444; font-size: 14px; margin-top: 10px; text-align: center; word-break: break-all; }
+    </style>
 </head>
 <body>
-  <div class="header">
-    <h1>星环终端 - 管理后台</h1>
-  </div>
 
-  <div class="container">
-    <div id="loginSection" class="card">
-      <h2>管理员登录</h2>
-      <div class="form-group">
-        <label>账号</label>
-        <input type="text" id="username" placeholder="sun-yilin">
-      </div>
-      <div class="form-group">
-        <label>密码</label>
-        <input type="password" id="password">
-      </div>
-      <button class="btn" onclick="login()">登录</button>
+    <!-- 顶部 -->
+    <div class="header">
+        <h1>星环终端</h1>
+        <p>团队工作台</p>
     </div>
 
-    <div id="adminSection" style="display:none;">
-      <div class="card">
-        <h2>分配新 KPI</h2>
-        <div class="form-group">
-          <label>选择成员</label>
-          <select id="taskOwner"></select>
-        </div>
-        <div class="form-group">
-          <label>任务标题</label>
-          <input type="text" id="taskTitle" placeholder="例如：完成苏轼 RAG 测试">
-        </div>
-        <div class="form-group">
-          <label>截止时间</label>
-          <input type="datetime-local" id="taskDeadline">
-        </div>
-        <div class="form-group">
-          <label>优先级</label>
-          <select id="taskPriority">
-            <option value="P0">P0 - 必须完成</option>
-            <option value="P1">P1 - 尽力完成</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>详细说明</label>
-          <textarea id="taskDesc" rows="3"></textarea>
-        </div>
-        <button class="btn" onclick="assignTask()">分配任务</button>
-      </div>
+    <!-- 登录/注册视图 -->
+    <div id="authView" class="container">
+        <div class="auth-card">
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('login')">登录</div>
+                <div class="tab" onclick="switchTab('register')">首次注册</div>
+            </div>
+            
+            <!-- 登录表单 -->
+            <div id="loginForm">
+                <div class="form-group">
+                    <label>账号</label>
+                    <input type="text" id="loginUsername" placeholder="请输入账号" onkeydown="if(event.key==='Enter') handleLogin()">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="loginPassword" placeholder="请输入密码" onkeydown="if(event.key==='Enter') handleLogin()">
+                </div>
+                <button class="btn" onclick="handleLogin()">登录</button>
+                <div id="loginError" class="error-msg"></div>
+            </div>
 
-      <div class="card">
-        <h2>团队成员</h2>
-        <div id="memberList"></div>
-      </div>
+            <!-- 注册表单 -->
+            <div id="registerForm" class="hidden">
+                <div class="form-group">
+                    <label>邀请码</label>
+                    <input type="text" id="regInviteCode" placeholder="如 xh001 或 test001">
+                </div>
+                <div class="form-group">
+                    <label>显示名称</label>
+                    <input type="text" id="regDisplayName" placeholder="你的名字（外部测试必填）">
+                </div>
+                <div class="form-group">
+                    <label>账号</label>
+                    <input type="text" id="regUsername" placeholder="自定义登录账号（英文/数字）">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="regPassword" placeholder="设置密码">
+                </div>
+                <button class="btn" onclick="handleRegister()">注册并登录</button>
+                <button class="btn btn-outline" onclick="autoFillTestAccount()">一键生成外部测试账号</button>
+                <div id="regError" class="error-msg"></div>
+            </div>
 
-      <div class="card">
-        <h2>苏轼对话记录（内部测试）</h2>
-        <div class="form-group">
-          <label>选择成员查看记录</label>
-          <select id="chatUserSelect" onchange="loadChatHistory()">
-            <option value="">请选择成员</option>
-          </select>
+            <!-- 外部测试说明 -->
+            <div class="guide-box">
+                <strong>外部测试人员提示：</strong><br>
+                1. 首次访问请点击上方“<strong>首次注册</strong>”。<br>
+                2. 邀请码请填写：<strong>test001</strong>、<strong>test002</strong> 或 <strong>test003</strong>。<br>
+                3. 请务必填写“显示名称”，并记住自定义的“账号”和“密码”，之后用它们登录。
+            </div>
         </div>
-        <div id="chatHistoryList" style="max-height: 500px; overflow-y: auto;">
-          <div class="loading">请选择成员查看对话记录</div>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>玩家行为画像（心理分析）</h2>
-        <div class="form-group">
-          <label>选择成员查看画像</label>
-          <select id="profileUserSelect" onchange="loadPsychProfile()">
-            <option value="">请选择成员</option>
-          </select>
-        </div>
-        <div id="psychProfileDisplay">
-          <div class="loading">请选择成员查看心理画像</div>
-        </div>
-        <div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px; font-size: 13px; color: #666; line-height: 1.6;">
-          <strong>维度说明：</strong><br>
-          共情倾向：温情行为、承认恐惧、主动停手、犹豫时长<br>
-          猎奇倾向：语录要求、快速逼问、复制粘贴考据<br>
-          犹豫倾向：发送前停顿、删改频率、打开又关闭次数<br>
-          控制倾向：反复切换模式、撤回改写、连续追问<br>
-          <span style="color: #dc3545;">注意：画像仅驱动苏轼反应，不用于评判用户</span>
-        </div>
-      </div>
     </div>
-  </div>
 
-  <script>
-    // ★★★ teamApi 访问地址（保持你上次改好的，别动）★★★
-    const API = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com";
-    let token = localStorage.getItem("xinghuan_token");
-
-    async function api(action, data) {
-      const res = await fetch(API, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, data, token })
-      });
-      return await res.json();
-    }
-
-    async function login() {
-      const r = await api("login", {
-        username: document.getElementById("username").value,
-        password: document.getElementById("password").value
-      });
-      if (r.error) { alert(r.error); return; }
-      if (r.role !== "admin") {
-        alert("非管理员账号");
-        localStorage.removeItem("xinghuan_token");
-        window.location.href = "member.html";
-        return;
-      }
-      token = r.token;
-      localStorage.setItem("xinghuan_token", token);
-      showAdmin();
-    }
-
-    async function showAdmin() {
-      document.getElementById("loginSection").style.display = "none";
-      document.getElementById("adminSection").style.display = "block";
-
-      const r = await api("list_members", {});
-      const select = document.getElementById("taskOwner");
-      const list = document.getElementById("memberList");
-      const chatSelect = document.getElementById("chatUserSelect");
-      const profileSelect = document.getElementById("profileUserSelect");
-
-      select.innerHTML = r.members.map(m => `<option value="${m.username}">${m.name} (${m.department})</option>`).join("");
-      list.innerHTML = r.members.map(m => `
-        <div class="member-row">
-          <div>
-            <div class="member-name">${m.name}</div>
-            <div class="member-dept">${m.department} | ${m.role === "admin" ? "管理员" : "成员"}</div>
-          </div>
-          <div style="font-size:12px; color:#666;">${m.username}</div>
+    <!-- 主工作台视图 -->
+    <div id="mainView" class="hidden">
+        <div class="nav-bar">
+            <div class="nav-item active" id="navTasks" onclick="switchMainTab('tasks')">我的 KPI</div>
+            <div class="nav-item" id="navTeam" onclick="switchMainTab('team')">团队进度</div>
+            
+            <!-- 管理员专属入口，默认隐藏 -->
+            <div class="nav-item admin-btn hidden" id="navAdmin" onclick="location.href='admin.html'">进入管理后台 →</div>
+            
+            <div class="nav-item logout" onclick="handleLogout()">退出登录</div>
         </div>
-      `).join("");
-      chatSelect.innerHTML = '<option value="">请选择成员</option>' +
-        r.members.map(m => `<option value="${m.username}">${m.name}</option>`).join("");
-      profileSelect.innerHTML = '<option value="">请选择成员</option>' +
-        r.members.map(m => `<option value="${m.username}">${m.name}</option>`).join("");
-    }
 
-    async function assignTask() {
-      const r = await api("assign_task", {
-        title: document.getElementById("taskTitle").value,
-        owner: document.getElementById("taskOwner").value,
-        deadline: document.getElementById("taskDeadline").value,
-        priority: document.getElementById("taskPriority").value,
-        description: document.getElementById("taskDesc").value
-      });
-      if (r.error) { alert(r.error); return; }
-      alert("分配成功");
-      document.getElementById("taskTitle").value = "";
-      document.getElementById("taskDesc").value = "";
-    }
+        <div class="container">
+            <!-- 我的任务面板 -->
+            <div id="panelTasks">
+                <h3 style="margin-bottom: 15px; color: var(--primary);">我的任务列表</h3>
+                <div id="taskList"></div>
+            </div>
 
-    async function loadChatHistory() {
-      const username = document.getElementById("chatUserSelect").value;
-      const list = document.getElementById("chatHistoryList");
+            <!-- 团队进度面板 -->
+            <div id="panelTeam" class="hidden">
+                <h3 style="margin-bottom: 15px; color: var(--primary);">团队 KPI 看板</h3>
+                <div id="teamList"></div>
+            </div>
+        </div>
+    </div>
 
-      if (!username) {
-        list.innerHTML = '<div class="loading">请选择成员查看对话记录</div>';
-        return;
-      }
+    <script>
+        // ==========================================
+        // ⚠️ 配置区：已填入你的真实地址
+        // ==========================================
+        const TEAM_API = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com"; 
 
-      list.innerHTML = '<div class="loading">加载中...</div>';
+        // 全局状态
+        let currentUser = null;
+        let currentToken = null;
 
-      try {
-        const r = await api("get_chat_history", { username });
-        if (r.error) {
-          list.innerHTML = `<div class="error-msg">${r.error}</div>`;
-          return;
+        // 初始化
+        window.onload = () => {
+            const savedToken = localStorage.getItem('xh_token');
+            const savedUser = localStorage.getItem('xh_user');
+            if (savedToken && savedUser) {
+                try {
+                    currentToken = savedToken;
+                    currentUser = JSON.parse(savedUser);
+                    if (currentUser && currentUser.username) {
+                        showMainView();
+                    } else {
+                        handleLogout();
+                    }
+                } catch(e) {
+                    handleLogout();
+                }
+            }
+        };
+
+        // 统一请求封装
+        async function apiCall(action, dataParams, useToken = true) {
+            try {
+                const body = { action };
+                if (useToken && currentToken) body.token = currentToken;
+                if (dataParams) body.data = dataParams;
+
+                const res = await fetch(TEAM_API, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                
+                const result = await res.json();
+                
+                if (!res.ok) {
+                    throw new Error(result.error || result.message || `HTTP错误: ${res.status}`);
+                }
+                if (result.error) {
+                    throw new Error(result.error);
+                }
+                return result;
+            } catch (err) {
+                console.error(`API [${action}] 出错:`, err);
+                throw err;
+            }
         }
 
-        // 印象簿区块
-        let bookHtml = "";
-        if (r.impressions && r.impressions.length > 0) {
-          bookHtml = `
-            <div class="impression-book">
-              <h3>📖 苏轼的印象簿（${r.impressions.length} 条旧忆 · 第 ${r.session_count} 局 · 累计 ${r.total_rounds || 0} 轮）</h3>
-              ${r.impressions.map(s => `<div class="impression-item">${escapeHtml(s)}</div>`).join("")}
-            </div>
-          `;
-        } else {
-          bookHtml = `
-            <div class="impression-book">
-              <h3>📖 苏轼的印象簿</h3>
-              <div class="impression-empty">尚无旧忆——苏轼还未记住这个人。</div>
-            </div>
-          `;
+        // 切换登录/注册 Tab
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            if (tab === 'login') {
+                document.getElementById('loginForm').classList.remove('hidden');
+                document.getElementById('registerForm').classList.add('hidden');
+            } else {
+                document.getElementById('loginForm').classList.add('hidden');
+                document.getElementById('registerForm').classList.remove('hidden');
+            }
+            document.getElementById('loginError').innerText = '';
+            document.getElementById('regError').innerText = '';
         }
 
-        if (!r.history || r.history.length === 0) {
-          list.innerHTML = bookHtml + '<div class="loading">该成员本局暂无对话</div>';
-          return;
+        // 一键生成测试账号
+        function autoFillTestAccount() {
+            const randomId = Math.floor(Math.random() * 90000) + 10000;
+            document.getElementById('regInviteCode').value = "test001";
+            document.getElementById('regDisplayName').value = "外部测试_" + randomId;
+            document.getElementById('regUsername').value = "test_" + randomId;
+            document.getElementById('regPassword').value = "123456";
+            document.getElementById('regError').innerText = "已自动填入，请点击下方【注册并登录】";
+            document.getElementById('regError').style.color = "var(--accent)";
         }
 
-        let statsHtml = `
-          <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-size: 13px;">
-            <strong>会话统计：</strong> 第 ${r.session_count} 局 |
-            当前执念值: ${r.current_obsession} |
-            本局消息: ${r.history.length} 条
-          </div>
-        `;
+        // 登录
+        async function handleLogin() {
+            const btn = event.target;
+            const errDiv = document.getElementById('loginError');
+            const usernameInput = document.getElementById('loginUsername').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
+            
+            if (!usernameInput || !password) {
+                errDiv.innerText = "请输入账号和密码";
+                return;
+            }
 
-        let historyHtml = r.history.slice().reverse().map(h => {
-          const timeStr = h.timestamp ? new Date(h.timestamp).toLocaleString() : "时间未知";
+            btn.innerText = "登录中...";
+            btn.disabled = true;
+            errDiv.innerText = "";
 
-          if (h.role === "assistant") {
-            const tag = h.proactive ? " | 苏轼主动搭话" : " | 苏轼";
-            return `
-              <div class="chat-record-answer">
-                <div class="chat-meta">${timeStr}${tag}</div>
-                <div class="chat-a"><strong>答：</strong>${escapeHtml(h.content)}</div>
-              </div>
-            `;
-          }
+            try {
+                const resData = await apiCall('login', { username: usernameInput, password: password }, false);
+                
+                if (!resData.token) {
+                    throw new Error("登录成功，但后端未返回 token");
+                }
 
-          const hesit = (h.behavior && h.behavior.hesitationScore != null)
-            ? (h.behavior.hesitationScore * 100).toFixed(0) + "%"
-            : "未知";
-          const delCount = (h.behavior && h.behavior.delete_count != null) ? h.behavior.delete_count : "?";
-
-          return `
-            <div class="chat-record">
-              <div class="chat-meta">${timeStr} | 类型: ${h.type || 'normal'}</div>
-              <div class="chat-q"><strong>问：</strong>${escapeHtml(h.content)}</div>
-              <div style="font-size:12px;color:#999;margin:4px 0;">[行为: 犹豫${hesit}, 删改${delCount}次]</div>
-            </div>
-          `;
-        }).join("");
-
-        list.innerHTML = bookHtml + statsHtml + historyHtml;
-      } catch (err) {
-        list.innerHTML = '<div class="error-msg">加载失败，请检查网络</div>';
-      }
-    }
-
-    async function loadPsychProfile() {
-      const username = document.getElementById("profileUserSelect").value;
-      const display = document.getElementById("psychProfileDisplay");
-
-      if (!username) {
-        display.innerHTML = '<div class="loading">请选择成员查看心理画像</div>';
-        return;
-      }
-
-      display.innerHTML = '<div class="loading">加载中...</div>';
-
-      try {
-        const r = await api("get_psych_profile", { username });
-        if (r.error) {
-          display.innerHTML = `<div class="error-msg">${r.error}</div>`;
-          return;
+                currentToken = resData.token;
+                currentUser = { 
+                    username: usernameInput, 
+                    name: resData.name || usernameInput, 
+                    role: resData.role || 'member' 
+                };
+                
+                localStorage.setItem('xh_token', currentToken);
+                localStorage.setItem('xh_user', JSON.stringify(currentUser));
+                showMainView();
+            } catch (err) {
+                if (err.message.includes("账号或密码错误")) {
+                    errDiv.innerHTML = "账号或密码错误。<br><span style='color:#64748b; font-size:12px;'>如果是首次使用，请点击上方【首次注册】。</span>";
+                } else {
+                    errDiv.innerText = err.message;
+                }
+            } finally {
+                btn.innerText = "登录";
+                btn.disabled = false;
+            }
         }
 
-        if (!r.profile || !r.profile.dimensions) {
-          display.innerHTML = '<div class="loading">该成员暂无画像数据（可能未进行对话或样本不足）</div>';
-          return;
+        // 注册
+        async function handleRegister() {
+            const btn = event.target;
+            const errDiv = document.getElementById('regError');
+            const invite_code = document.getElementById('regInviteCode').value.trim();
+            const display_name = document.getElementById('regDisplayName').value.trim();
+            const usernameInput = document.getElementById('regUsername').value.trim();
+            const password = document.getElementById('regPassword').value.trim();
+
+            if (!invite_code || !usernameInput || !password) {
+                errDiv.innerText = "请填写邀请码、账号和密码";
+                return;
+            }
+
+            if (invite_code.startsWith("test") && !display_name) {
+                errDiv.innerText = "外部测试人员请填写【显示名称】";
+                return;
+            }
+
+            btn.innerText = "注册中...";
+            btn.disabled = true;
+            errDiv.innerText = "";
+            errDiv.style.color = "#ef4444";
+
+            try {
+                const resData = await apiCall('register', { 
+                    invite_code, 
+                    display_name, 
+                    username: usernameInput, 
+                    password 
+                }, false);
+                
+                if (!resData.token) {
+                    throw new Error("注册成功，但后端未返回 token");
+                }
+
+                currentToken = resData.token;
+                currentUser = { 
+                    username: usernameInput, 
+                    name: resData.name || display_name || usernameInput, 
+                    role: resData.role || 'member' 
+                };
+                
+                localStorage.setItem('xh_token', currentToken);
+                localStorage.setItem('xh_user', JSON.stringify(currentUser));
+                showMainView();
+            } catch (err) {
+                errDiv.innerText = err.message;
+            } finally {
+                btn.innerText = "注册并登录";
+                btn.disabled = false;
+            }
         }
 
-        const d = r.profile.dimensions;
-        const confidence = r.profile.confidence || 0;
-        const sampleCount = r.profile.sample_count || 0;
-
-        let tendency = "平衡型";
-        let tendencyDesc = "互动风格较为均衡，无明显倾向";
-        if (d.empathy > 0.6) {
-          tendency = "共情型";
-          tendencyDesc = "倾向于温情互动，会犹豫并尊重苏轼的边界";
-        } else if (d.curiosity > 0.6) {
-          tendency = "猎奇型";
-          tendencyDesc = "倾向于探索边界，快速逼问，可能将苏轼视为观察对象";
-        } else if (d.hesitation > 0.6) {
-          tendency = "犹豫型";
-          tendencyDesc = "表达谨慎，多次删改，在意苏轼的反应";
-        } else if (d.control > 0.6) {
-          tendency = "控制型";
-          tendencyDesc = "倾向于掌控对话节奏，反复测试规则";
+        // 退出登录
+        function handleLogout() {
+            localStorage.removeItem('xh_token');
+            localStorage.removeItem('xh_user');
+            currentToken = null;
+            currentUser = null;
+            document.getElementById('mainView').classList.add('hidden');
+            document.getElementById('authView').classList.remove('hidden');
+            document.getElementById('loginPassword').value = '';
+            document.getElementById('loginError').innerText = '';
         }
 
-        display.innerHTML = `
-          <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 14px;">
-              <span><strong>分析样本：</strong>${sampleCount} 轮对话</span>
-              <span><strong>置信度：</strong>${(confidence * 100).toFixed(0)}%</span>
-            </div>
+        // 显示主界面
+        function showMainView() {
+            document.getElementById('authView').classList.add('hidden');
+            document.getElementById('mainView').classList.remove('hidden');
+            
+            // 判断是否是管理员，是的话显示管理后台按钮
+            if (currentUser && currentUser.role === 'admin') {
+                document.getElementById('navAdmin').classList.remove('hidden');
+            } else {
+                document.getElementById('navAdmin').classList.add('hidden');
+            }
 
-            <div class="profile-bar">
-              <div class="profile-bar-header">
-                <span>共情倾向</span><span>${d.empathy.toFixed(2)}</span>
-              </div>
-              <div class="profile-bar-track">
-                <div class="profile-bar-fill profile-empathy" style="width: ${d.empathy * 100}%"></div>
-              </div>
-            </div>
-
-            <div class="profile-bar">
-              <div class="profile-bar-header">
-                <span>猎奇倾向</span><span>${d.curiosity.toFixed(2)}</span>
-              </div>
-              <div class="profile-bar-track">
-                <div class="profile-bar-fill profile-curiosity" style="width: ${d.curiosity * 100}%"></div>
-              </div>
-            </div>
-
-            <div class="profile-bar">
-              <div class="profile-bar-header">
-                <span>犹豫倾向</span><span>${d.hesitation.toFixed(2)}</span>
-              </div>
-              <div class="profile-bar-track">
-                <div class="profile-bar-fill profile-hesitation" style="width: ${d.hesitation * 100}%"></div>
-              </div>
-            </div>
-
-            <div class="profile-bar">
-              <div class="profile-bar-header">
-                <span>控制倾向</span><span>${d.control.toFixed(2)}</span>
-              </div>
-              <div class="profile-bar-track">
-                <div class="profile-bar-fill profile-control" style="width: ${d.control * 100}%"></div>
-              </div>
-            </div>
-
-            <div class="profile-summary">
-              <div style="margin-bottom: 8px;">
-                <span style="font-size: 13px; color: #666;">当前倾向：</span>
-                <span class="profile-tendency">${tendency}</span>
-              </div>
-              <div style="font-size: 14px; color: #333; margin-bottom: 10px;">
-                ${tendencyDesc}
-              </div>
-              <div class="profile-note">
-                该画像驱动苏轼的初始态度基线和分支解锁，仅用于优化互动体验，不代表对用户的评判。
-                数据每局衰减 30%，避免早期行为过度影响后续判断。
-              </div>
-            </div>
-          </div>
-        `;
-      } catch (err) {
-        display.innerHTML = '<div class="error-msg">加载失败，请检查网络</div>';
-      }
-    }
-
-    function escapeHtml(text) {
-      const div = document.createElement("div");
-      div.textContent = text;
-      return div.innerHTML;
-    }
-
-    if (token) {
-      api("list_members", {}).then(r => {
-        if (!r.error) {
-          showAdmin();
-        } else {
-          localStorage.removeItem("xinghuan_token");
-          window.location.href = "member.html";
+            switchMainTab('tasks');
         }
-      });
-    }
-  </script>
+
+        // 切换主面板
+        function switchMainTab(tab) {
+            document.getElementById('panelTasks').classList.add('hidden');
+            document.getElementById('panelTeam').classList.add('hidden');
+            document.getElementById('navTasks').classList.remove('active');
+            document.getElementById('navTeam').classList.remove('active');
+
+            if (tab === 'tasks') {
+                document.getElementById('panelTasks').classList.remove('hidden');
+                document.getElementById('navTasks').classList.add('active');
+                loadMyTasks();
+            } else {
+                document.getElementById('panelTeam').classList.remove('hidden');
+                document.getElementById('navTeam').classList.add('active');
+                loadTeamProgress();
+            }
+        }
+
+        // 格式化日期
+        function formatDate(dateStr) {
+            if (!dateStr) return "无期限";
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return "无效日期";
+            return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        }
+
+        // 加载我的任务
+        async function loadMyTasks() {
+            const list = document.getElementById('taskList');
+            list.innerHTML = '<p style="text-align:center; color:var(--text-light);">加载中...</p>';
+            try {
+                const data = await apiCall('my_tasks', null, true);
+                const tasks = data.tasks || [];
+                if (tasks.length === 0) {
+                    list.innerHTML = '<p style="text-align:center; color:var(--text-light);">暂无任务</p>';
+                    return;
+                }
+                
+                list.innerHTML = tasks.map(task => `
+                    <div class="task-card">
+                        <div class="task-header">
+                            <span class="task-title">${task.title}</span>
+                            <span class="task-priority">${task.priority || '普通'}</span>
+                        </div>
+                        <div class="task-meta">截止时间: ${formatDate(task.deadline)} | 状态: <span class="task-status ${task.status}">${task.status === 'pending' ? '待处理' : task.status === 'submitted' ? '已提交' : '已通过'}</span></div>
+                        <div class="task-desc">${task.description || '无详细说明'}</div>
+                        ${task.status === 'pending' ? `
+                            <div class="submit-area">
+                                <input type="text" id="sub_${task.id}" placeholder="输入你的成果/链接...">
+                                <button class="btn btn-submit" style="width: auto; padding: 8px 15px; margin:0;" onclick="submitTask('${task.id}')">提交</button>
+                            </div>
+                        ` : ''}
+                    </div>
+                `).join('');
+            } catch (err) {
+                list.innerHTML = `<p class="error-msg">加载失败: ${err.message}</p>`;
+            }
+        }
+
+        // 提交任务
+        async function submitTask(taskId) {
+            const input = document.getElementById(`sub_${taskId}`);
+            const content = input.value.trim();
+            if (!content) {
+                alert("请先填写成果内容");
+                return;
+            }
+            input.disabled = true;
+            try {
+                await apiCall('submit_task', { task_id: taskId, content: content }, true);
+                alert("提交成功！");
+                loadMyTasks();
+            } catch (err) {
+                alert("提交失败: " + err.message);
+                input.disabled = false;
+            }
+        }
+
+        // 加载团队进度
+        async function loadTeamProgress() {
+            const list = document.getElementById('teamList');
+            list.innerHTML = '<p style="text-align:center; color:var(--text-light);">加载中...</p>';
+            try {
+                const data = await apiCall('team_progress', null, true);
+                const members = data.members || [];
+                
+                if (members.length === 0) {
+                    list.innerHTML = '<p style="text-align:center; color:var(--text-light);">暂无团队数据</p>';
+                    return;
+                }
+
+                list.innerHTML = members.map(m => {
+                    const tasks = m.tasks || [];
+                    const total = tasks.length;
+                    const done = tasks.filter(t => t.status === 'approved').length;
+                    const percent = total === 0 ? 0 : Math.round((done / total) * 100);
+                    
+                    return `
+                        <div class="team-member">
+                            <div style="display:flex; justify-content:space-between; font-weight:bold;">
+                                <span>${m.name || m.username} <span style="font-size:12px;font-weight:normal;color:var(--text-light);">(${m.department})</span></span>
+                                <span style="color:var(--text-light); font-size:14px;">${done}/${total} (${percent}%)</span>
+                            </div>
+                            <div class="progress-bar-container">
+                                <div class="progress-bar" style="width: ${percent}%; background: ${percent === 100 && total > 0 ? '#16a34a' : 'var(--accent)'};"></div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (err) {
+                list.innerHTML = `<p class="error-msg">加载失败: ${err.message}</p>`;
+            }
+        }
+    </script>
 </body>
 </html>
