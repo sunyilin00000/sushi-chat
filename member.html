@@ -13,6 +13,7 @@
             --text-light: #64748b;
             --border: #e2e8f0;
             --accent: #3b82f6;
+            --danger: #ef4444;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -56,7 +57,9 @@
         }
         .nav-item:hover { background: var(--bg); }
         .nav-item.active { background: var(--primary); color: white; }
-        .nav-item.logout { color: #ef4444; margin-left: auto; }
+        .nav-item.admin-btn { color: var(--danger); font-weight: bold; }
+        .nav-item.admin-btn:hover { background: #fee2e2; }
+        .nav-item.logout { color: var(--text-light); margin-left: auto; }
 
         /* 容器 */
         .container { max-width: 800px; margin: 0 auto; padding: 0 15px 50px 15px; }
@@ -82,15 +85,16 @@
         .tab.active { color: var(--primary); border-bottom: 2px solid var(--primary); }
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 5px; font-size: 14px; color: var(--text-light); }
-        .form-group input {
+        .form-group input, .form-group select, .form-group textarea {
             width: 100%;
             padding: 12px;
             border: 1px solid #cbd5e1;
             border-radius: 6px;
             font-size: 16px;
             outline: none;
+            font-family: inherit;
         }
-        .form-group input:focus { border-color: var(--accent); }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--accent); }
         .btn {
             width: 100%;
             padding: 14px;
@@ -164,6 +168,38 @@
             transition: width 0.3s;
         }
 
+        /* ===== 管理后台专属样式 ===== */
+        .admin-section { margin-top: 30px; }
+        .member-list { display: flex; flex-direction: column; gap: 10px; }
+        .member-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: white; }
+        .member-info h4 { font-size: 15px; margin-bottom: 4px; }
+        .member-info p { font-size: 12px; color: var(--text-light); }
+        .member-actions { display: flex; gap: 8px; }
+        .btn-small { padding: 6px 10px; font-size: 12px; border: none; border-radius: 4px; cursor: pointer; color: white; }
+        .btn-chat { background: #10b981; }
+        .btn-psych { background: #8b5cf6; }
+
+        /* 弹窗 */
+        .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; border-radius: 12px; width: 90%; max-width: 600px; max-height: 80vh; display: flex; flex-direction: column; }
+        .modal-header { padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h3 { font-size: 18px; }
+        .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-light); }
+        .modal-body { padding: 20px; overflow-y: auto; background: #f8fafc; }
+        
+        /* 聊天记录样式 */
+        .chat-record { margin-bottom: 15px; }
+        .chat-role { font-size: 12px; color: var(--text-light); margin-bottom: 4px; }
+        .chat-text { padding: 10px 14px; border-radius: 8px; font-size: 14px; line-height: 1.5; }
+        .chat-user .chat-text { background: #e0f2fe; color: #0369a1; }
+        .chat-ai .chat-text { background: white; border: 1px solid var(--border); }
+        
+        /* 心理画像样式 */
+        .psych-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .psych-item { background: white; padding: 15px; border-radius: 8px; border: 1px solid var(--border); text-align: center; }
+        .psych-item .label { font-size: 13px; color: var(--text-light); margin-bottom: 8px; }
+        .psych-item .value { font-size: 24px; font-weight: bold; color: var(--accent); }
+
         .hidden { display: none !important; }
         .error-msg { color: #ef4444; font-size: 14px; margin-top: 10px; text-align: center; word-break: break-all; }
     </style>
@@ -184,7 +220,6 @@
                 <div class="tab" onclick="switchTab('register')">首次注册</div>
             </div>
             
-            <!-- 登录表单 -->
             <div id="loginForm">
                 <div class="form-group">
                     <label>账号</label>
@@ -198,7 +233,6 @@
                 <div id="loginError" class="error-msg"></div>
             </div>
 
-            <!-- 注册表单 -->
             <div id="registerForm" class="hidden">
                 <div class="form-group">
                     <label>邀请码</label>
@@ -221,12 +255,11 @@
                 <div id="regError" class="error-msg"></div>
             </div>
 
-            <!-- 外部测试说明 -->
             <div class="guide-box">
                 <strong>外部测试人员提示：</strong><br>
                 1. 首次访问请点击上方“<strong>首次注册</strong>”。<br>
                 2. 邀请码请填写：<strong>test001</strong>、<strong>test002</strong> 或 <strong>test003</strong>。<br>
-                3. 请务必填写“显示名称”，并记住自定义的“账号”和“密码”，之后用它们登录。
+                3. 请务必填写“显示名称”，并记住自定义的“账号”和“密码”。
             </div>
         </div>
     </div>
@@ -236,6 +269,7 @@
         <div class="nav-bar">
             <div class="nav-item active" id="navTasks" onclick="switchMainTab('tasks')">我的 KPI</div>
             <div class="nav-item" id="navTeam" onclick="switchMainTab('team')">团队进度</div>
+            <div class="nav-item admin-btn hidden" id="navAdmin" onclick="switchMainTab('admin')">管理控制台</div>
             <div class="nav-item logout" onclick="handleLogout()">退出登录</div>
         </div>
 
@@ -251,20 +285,67 @@
                 <h3 style="margin-bottom: 15px; color: var(--primary);">团队 KPI 看板</h3>
                 <div id="teamList"></div>
             </div>
+
+            <!-- 管理员控制台面板 -->
+            <div id="panelAdmin" class="hidden">
+                <h3 style="margin-bottom: 15px; color: var(--primary);">分配新任务</h3>
+                <div class="task-card" style="border-left-color: var(--danger);">
+                    <div class="form-group">
+                        <label>分配给成员</label>
+                        <select id="assignOwner"><option value="">加载中...</option></select>
+                    </div>
+                    <div class="form-group">
+                        <label>任务标题</label>
+                        <input type="text" id="assignTitle" placeholder="例如：完成首页UI设计">
+                    </div>
+                    <div class="form-group">
+                        <label>详细说明</label>
+                        <textarea id="assignDesc" rows="3" placeholder="填写具体要求和链接..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>截止时间</label>
+                        <input type="datetime-local" id="assignDeadline">
+                    </div>
+                    <div class="form-group">
+                        <label>优先级</label>
+                        <select id="assignPriority">
+                            <option value="P0">P0（最高）</option>
+                            <option value="P1" selected>P1（普通）</option>
+                            <option value="P2">P2（较低）</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-submit" onclick="submitAssignTask()">下发任务</button>
+                </div>
+
+                <!-- 成员数据分析 -->
+                <div class="admin-section">
+                    <h3 style="margin-bottom: 15px; color: var(--primary);">成员数据分析</h3>
+                    <div class="member-list" id="adminMemberList">
+                        <p style="text-align:center; color:var(--text-light);">加载中...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 弹窗 -->
+    <div class="modal hidden" id="detailModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">详情</h3>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
         </div>
     </div>
 
     <script>
-        // ==========================================
-        // ⚠️ 配置区：已填入你的真实地址
-        // ==========================================
         const TEAM_API = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com"; 
 
-        // 全局状态
         let currentUser = null;
         let currentToken = null;
+        let membersCache = [];
 
-        // 初始化
         window.onload = () => {
             const savedToken = localStorage.getItem('xh_token');
             const savedUser = localStorage.getItem('xh_user');
@@ -283,7 +364,6 @@
             }
         };
 
-        // 统一请求封装
         async function apiCall(action, dataParams, useToken = true) {
             try {
                 const body = { action };
@@ -297,13 +377,8 @@
                 });
                 
                 const result = await res.json();
-                
-                if (!res.ok) {
-                    throw new Error(result.error || result.message || `HTTP错误: ${res.status}`);
-                }
-                if (result.error) {
-                    throw new Error(result.error);
-                }
+                if (!res.ok) throw new Error(result.error || result.message || `HTTP错误: ${res.status}`);
+                if (result.error) throw new Error(result.error);
                 return result;
             } catch (err) {
                 console.error(`API [${action}] 出错:`, err);
@@ -311,7 +386,6 @@
             }
         }
 
-        // 切换登录/注册 Tab
         function switchTab(tab) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             event.target.classList.add('active');
@@ -326,7 +400,6 @@
             document.getElementById('regError').innerText = '';
         }
 
-        // 一键生成测试账号
         function autoFillTestAccount() {
             const randomId = Math.floor(Math.random() * 90000) + 10000;
             document.getElementById('regInviteCode').value = "test001";
@@ -337,7 +410,6 @@
             document.getElementById('regError').style.color = "var(--accent)";
         }
 
-        // 登录
         async function handleLogin() {
             const btn = event.target;
             const errDiv = document.getElementById('loginError');
@@ -356,16 +428,10 @@
             try {
                 const resData = await apiCall('login', { username: usernameInput, password: password }, false);
                 
-                if (!resData.token) {
-                    throw new Error("登录成功，但后端未返回 token");
-                }
+                if (!resData.token) throw new Error("登录成功，但后端未返回 token");
 
                 currentToken = resData.token;
-                currentUser = { 
-                    username: usernameInput, 
-                    name: resData.name || usernameInput, 
-                    role: resData.role || 'member' 
-                };
+                currentUser = { username: usernameInput, name: resData.name || usernameInput, role: resData.role || 'member' };
                 
                 localStorage.setItem('xh_token', currentToken);
                 localStorage.setItem('xh_user', JSON.stringify(currentUser));
@@ -382,7 +448,6 @@
             }
         }
 
-        // 注册
         async function handleRegister() {
             const btn = event.target;
             const errDiv = document.getElementById('regError');
@@ -395,7 +460,6 @@
                 errDiv.innerText = "请填写邀请码、账号和密码";
                 return;
             }
-
             if (invite_code.startsWith("test") && !display_name) {
                 errDiv.innerText = "外部测试人员请填写【显示名称】";
                 return;
@@ -407,23 +471,11 @@
             errDiv.style.color = "#ef4444";
 
             try {
-                const resData = await apiCall('register', { 
-                    invite_code, 
-                    display_name, 
-                    username: usernameInput, 
-                    password 
-                }, false);
-                
-                if (!resData.token) {
-                    throw new Error("注册成功，但后端未返回 token");
-                }
+                const resData = await apiCall('register', { invite_code, display_name, username: usernameInput, password }, false);
+                if (!resData.token) throw new Error("注册成功，但后端未返回 token");
 
                 currentToken = resData.token;
-                currentUser = { 
-                    username: usernameInput, 
-                    name: resData.name || display_name || usernameInput, 
-                    role: resData.role || 'member' 
-                };
+                currentUser = { username: usernameInput, name: resData.name || display_name || usernameInput, role: resData.role || 'member' };
                 
                 localStorage.setItem('xh_token', currentToken);
                 localStorage.setItem('xh_user', JSON.stringify(currentUser));
@@ -436,7 +488,6 @@
             }
         }
 
-        // 退出登录
         function handleLogout() {
             localStorage.removeItem('xh_token');
             localStorage.removeItem('xh_user');
@@ -448,32 +499,43 @@
             document.getElementById('loginError').innerText = '';
         }
 
-        // 显示主界面
         function showMainView() {
             document.getElementById('authView').classList.add('hidden');
             document.getElementById('mainView').classList.remove('hidden');
+            
+            if (currentUser && currentUser.role === 'admin') {
+                document.getElementById('navAdmin').classList.remove('hidden');
+            } else {
+                document.getElementById('navAdmin').classList.add('hidden');
+            }
+
             switchMainTab('tasks');
         }
 
-        // 切换主面板
         function switchMainTab(tab) {
             document.getElementById('panelTasks').classList.add('hidden');
             document.getElementById('panelTeam').classList.add('hidden');
+            document.getElementById('panelAdmin').classList.add('hidden');
+            
             document.getElementById('navTasks').classList.remove('active');
             document.getElementById('navTeam').classList.remove('active');
+            document.getElementById('navAdmin').classList.remove('active');
 
             if (tab === 'tasks') {
                 document.getElementById('panelTasks').classList.remove('hidden');
                 document.getElementById('navTasks').classList.add('active');
                 loadMyTasks();
-            } else {
+            } else if (tab === 'team') {
                 document.getElementById('panelTeam').classList.remove('hidden');
                 document.getElementById('navTeam').classList.add('active');
                 loadTeamProgress();
+            } else if (tab === 'admin') {
+                document.getElementById('panelAdmin').classList.remove('hidden');
+                document.getElementById('navAdmin').classList.add('active');
+                loadAdminData();
             }
         }
 
-        // 格式化日期
         function formatDate(dateStr) {
             if (!dateStr) return "无期限";
             const d = new Date(dateStr);
@@ -481,7 +543,6 @@
             return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
         }
 
-        // 加载我的任务
         async function loadMyTasks() {
             const list = document.getElementById('taskList');
             list.innerHTML = '<p style="text-align:center; color:var(--text-light);">加载中...</p>';
@@ -514,14 +575,10 @@
             }
         }
 
-        // 提交任务
         async function submitTask(taskId) {
             const input = document.getElementById(`sub_${taskId}`);
             const content = input.value.trim();
-            if (!content) {
-                alert("请先填写成果内容");
-                return;
-            }
+            if (!content) { alert("请先填写成果内容"); return; }
             input.disabled = true;
             try {
                 await apiCall('submit_task', { task_id: taskId, content: content }, true);
@@ -533,14 +590,12 @@
             }
         }
 
-        // 加载团队进度
         async function loadTeamProgress() {
             const list = document.getElementById('teamList');
             list.innerHTML = '<p style="text-align:center; color:var(--text-light);">加载中...</p>';
             try {
                 const data = await apiCall('team_progress', null, true);
                 const members = data.members || [];
-                
                 if (members.length === 0) {
                     list.innerHTML = '<p style="text-align:center; color:var(--text-light);">暂无团队数据</p>';
                     return;
@@ -551,7 +606,6 @@
                     const total = tasks.length;
                     const done = tasks.filter(t => t.status === 'approved').length;
                     const percent = total === 0 ? 0 : Math.round((done / total) * 100);
-                    
                     return `
                         <div class="team-member">
                             <div style="display:flex; justify-content:space-between; font-weight:bold;">
@@ -566,6 +620,131 @@
                 }).join('');
             } catch (err) {
                 list.innerHTML = `<p class="error-msg">加载失败: ${err.message}</p>`;
+            }
+        }
+
+        // ==========================================
+        // 管理员专属逻辑
+        // ==========================================
+        async function loadAdminData() {
+            const select = document.getElementById('assignOwner');
+            const list = document.getElementById('adminMemberList');
+            select.innerHTML = '<option value="">加载中...</option>';
+            list.innerHTML = '<p style="text-align:center;">加载中...</p>';
+
+            try {
+                const data = await apiCall('list_members', null, true);
+                membersCache = data.members || [];
+                
+                // 填充下拉框
+                select.innerHTML = '<option value="">请选择成员...</option>';
+                membersCache.filter(m => m.department !== '外部测试').forEach(m => {
+                    select.innerHTML += `<option value="${m.username}">${m.name} (${m.department})</option>`;
+                });
+
+                // 填充列表
+                list.innerHTML = membersCache.map(m => `
+                    <div class="member-item">
+                        <div class="member-info">
+                            <h4>${m.name || m.username} <span style="font-size:12px; color:var(--text-light);">(${m.role})</span></h4>
+                            <p>${m.department}</p>
+                        </div>
+                        <div class="member-actions">
+                            <button class="btn-small btn-chat" onclick="viewChat('${m.username}', '${m.name}')">对话</button>
+                            <button class="btn-small btn-psych" onclick="viewPsych('${m.username}', '${m.name}')">画像</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                select.innerHTML = '<option value="">加载失败</option>';
+                list.innerHTML = `<p class="error-msg">加载失败: ${err.message}</p>`;
+            }
+        }
+
+        async function submitAssignTask() {
+            const owner = document.getElementById('assignOwner').value;
+            const title = document.getElementById('assignTitle').value.trim();
+            const desc = document.getElementById('assignDesc').value.trim();
+            const deadlineInput = document.getElementById('assignDeadline').value;
+            const priority = document.getElementById('assignPriority').value;
+
+            if (!owner || !title || !deadlineInput) { alert("请填全成员、标题和截止时间"); return; }
+            const deadline = new Date(deadlineInput).toISOString();
+
+            try {
+                await apiCall('assign_task', { owner, title, description: desc, deadline, priority }, true);
+                alert("任务下发成功！");
+                document.getElementById('assignTitle').value = '';
+                document.getElementById('assignDesc').value = '';
+            } catch (err) {
+                alert("下发失败: " + err.message);
+            }
+        }
+
+        function closeModal() { document.getElementById('detailModal').classList.add('hidden'); }
+
+        async function viewChat(username, name) {
+            document.getElementById('modalTitle').innerText = `${name} 的对话记录`;
+            document.getElementById('modalBody').innerHTML = '<p style="text-align:center;">加载中...</p>';
+            document.getElementById('detailModal').classList.remove('hidden');
+
+            try {
+                const data = await apiCall('get_chat_history', { username });
+                const history = data.history || [];
+                
+                if (history.length === 0) {
+                    document.getElementById('modalBody').innerHTML = '<p style="text-align:center; color:#64748b;">暂无对话记录</p>';
+                    return;
+                }
+
+                let html = '';
+                if (data.impressions && data.impressions.length > 0) {
+                    html += `<div style="background:#fef3c7; padding:10px; border-radius:8px; margin-bottom:15px; font-size:13px;">
+                        <strong>苏轼的印象簿：</strong><br>${data.impressions.join('<br>')}
+                    </div>`;
+                }
+
+                html += history.map(msg => `
+                    <div class="chat-record chat-${msg.role === 'user' ? 'user' : 'ai'}">
+                        <div class="chat-role">${msg.role === 'user' ? '用户' : '苏轼'}</div>
+                        <div class="chat-text">${msg.content}</div>
+                    </div>
+                `).join('');
+                
+                document.getElementById('modalBody').innerHTML = html;
+            } catch (err) {
+                document.getElementById('modalBody').innerHTML = `<p style="color:red; text-align:center;">拉取失败: ${err.message}</p>`;
+            }
+        }
+
+        async function viewPsych(username, name) {
+            document.getElementById('modalTitle').innerText = `${name} 的心理画像`;
+            document.getElementById('modalBody').innerHTML = '<p style="text-align:center;">加载中...</p>';
+            document.getElementById('detailModal').classList.remove('hidden');
+
+            try {
+                const data = await apiCall('get_psych_profile', { username });
+                if (!data.profile) {
+                    document.getElementById('modalBody').innerHTML = '<p style="text-align:center; color:#64748b;">暂无画像数据</p>';
+                    return;
+                }
+
+                const dim = data.profile.dimensions || {};
+                document.getElementById('modalBody').innerHTML = `
+                    <div class="psych-grid">
+                        <div class="psych-item"><div class="label">共情度 (Empathy)</div><div class="value">${(dim.empathy || 0).toFixed(2)}</div></div>
+                        <div class="psych-item"><div class="label">好奇心 (Curiosity)</div><div class="value">${(dim.curiosity || 0).toFixed(2)}</div></div>
+                        <div class="psych-item"><div class="label">犹豫度 (Hesitation)</div><div class="value">${(dim.hesitation || 0).toFixed(2)}</div></div>
+                        <div class="psych-item"><div class="label">掌控欲 (Control)</div><div class="value">${(dim.control || 0).toFixed(2)}</div></div>
+                        <div class="psych-item"><div class="label">学术性 (Scholarly)</div><div class="value">${(dim.scholarly || 0).toFixed(2)}</div></div>
+                        <div class="psych-item"><div class="label">参与度 (Engagement)</div><div class="value">${(dim.engagement || 0).toFixed(2)}</div></div>
+                    </div>
+                    <p style="text-align:center; margin-top:20px; font-size:13px; color:#64748b;">
+                        数据置信度：${((data.profile.confidence || 0) * 100).toFixed(0)}% (已采样 ${data.profile.sample_count || 0} 次)
+                    </p>
+                `;
+            } catch (err) {
+                document.getElementById('modalBody').innerHTML = `<p style="color:red; text-align:center;">拉取失败: ${err.message}</p>`;
             }
         }
     </script>
