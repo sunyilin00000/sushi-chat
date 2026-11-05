@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>星环终端 - 团队工作台</title>
+    <!-- 引入 Chart.js 用于绘制雷达图 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --primary: #1e293b;
@@ -181,10 +183,10 @@
 
         /* 弹窗 */
         .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: white; border-radius: 12px; width: 90%; max-width: 600px; max-height: 80vh; display: flex; flex-direction: column; }
+        .modal-content { background: white; border-radius: 12px; width: 90%; max-width: 600px; max-height: 85vh; display: flex; flex-direction: column; }
         .modal-header { padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
         .modal-header h3 { font-size: 18px; }
-        .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-light); }
+        .modal-close { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-light); }
         .modal-body { padding: 20px; overflow-y: auto; background: #f8fafc; }
         
         /* 聊天记录样式 */
@@ -194,11 +196,16 @@
         .chat-user .chat-text { background: #e0f2fe; color: #0369a1; }
         .chat-ai .chat-text { background: white; border: 1px solid var(--border); }
         
-        /* 心理画像样式 */
-        .psych-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .psych-item { background: white; padding: 15px; border-radius: 8px; border: 1px solid var(--border); text-align: center; }
-        .psych-item .label { font-size: 13px; color: var(--text-light); margin-bottom: 8px; }
-        .psych-item .value { font-size: 24px; font-weight: bold; color: var(--accent); }
+        /* 心理画像图表样式 */
+        .psych-chart-container { background: white; padding: 20px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px; display: flex; justify-content: center; }
+        .chart-wrapper { width: 100%; max-width: 350px; height: 300px; position: relative; }
+        
+        /* 评估报告样式 */
+        .report-box { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 15px; }
+        .report-box h4 { font-size: 16px; color: var(--primary); margin-bottom: 10px; border-left: 4px solid var(--accent); padding-left: 10px; }
+        .report-box p { font-size: 14px; line-height: 1.6; color: var(--text); margin-bottom: 10px; }
+        .report-box.advice h4 { border-left-color: #f59e0b; }
+        .report-box.warning h4 { border-left-color: var(--danger); color: var(--danger); }
 
         .hidden { display: none !important; }
         .error-msg { color: #ef4444; font-size: 14px; margin-top: 10px; text-align: center; word-break: break-all; }
@@ -345,6 +352,7 @@
         let currentUser = null;
         let currentToken = null;
         let membersCache = [];
+        let psychChartInstance = null; // 保存图表实例以便销毁
 
         window.onload = () => {
             const savedToken = localStorage.getItem('xh_token');
@@ -427,7 +435,6 @@
 
             try {
                 const resData = await apiCall('login', { username: usernameInput, password: password }, false);
-                
                 if (!resData.token) throw new Error("登录成功，但后端未返回 token");
 
                 currentToken = resData.token;
@@ -636,13 +643,11 @@
                 const data = await apiCall('list_members', null, true);
                 membersCache = data.members || [];
                 
-                // 填充下拉框
                 select.innerHTML = '<option value="">请选择成员...</option>';
                 membersCache.filter(m => m.department !== '外部测试').forEach(m => {
                     select.innerHTML += `<option value="${m.username}">${m.name} (${m.department})</option>`;
                 });
 
-                // 填充列表
                 list.innerHTML = membersCache.map(m => `
                     <div class="member-item">
                         <div class="member-info">
@@ -651,7 +656,7 @@
                         </div>
                         <div class="member-actions">
                             <button class="btn-small btn-chat" onclick="viewChat('${m.username}', '${m.name}')">对话</button>
-                            <button class="btn-small btn-psych" onclick="viewPsych('${m.username}', '${m.name}')">画像</button>
+                            <button class="btn-small btn-psych" onclick="viewPsych('${m.username}', '${m.name}')">分析图</button>
                         </div>
                     </div>
                 `).join('');
@@ -681,9 +686,16 @@
             }
         }
 
-        function closeModal() { document.getElementById('detailModal').classList.add('hidden'); }
+        function closeModal() { 
+            document.getElementById('detailModal').classList.add('hidden'); 
+            if (psychChartInstance) {
+                psychChartInstance.destroy();
+                psychChartInstance = null;
+            }
+        }
 
         async function viewChat(username, name) {
+            if (psychChartInstance) { psychChartInstance.destroy(); psychChartInstance = null; }
             document.getElementById('modalTitle').innerText = `${name} 的对话记录`;
             document.getElementById('modalBody').innerHTML = '<p style="text-align:center;">加载中...</p>';
             document.getElementById('detailModal').classList.remove('hidden');
@@ -717,34 +729,146 @@
             }
         }
 
+        // ==========================================
+        // 核心：心理画像与多维雷达图
+        // ==========================================
         async function viewPsych(username, name) {
-            document.getElementById('modalTitle').innerText = `${name} 的心理画像`;
-            document.getElementById('modalBody').innerHTML = '<p style="text-align:center;">加载中...</p>';
+            document.getElementById('modalTitle').innerText = `${name} 的心理分析报告`;
+            document.getElementById('modalBody').innerHTML = '<p style="text-align:center; padding: 20px;">分析中...</p>';
             document.getElementById('detailModal').classList.remove('hidden');
 
             try {
                 const data = await apiCall('get_psych_profile', { username });
+                
                 if (!data.profile) {
-                    document.getElementById('modalBody').innerHTML = '<p style="text-align:center; color:#64748b;">暂无画像数据</p>';
+                    document.getElementById('modalBody').innerHTML = '<p style="text-align:center; color:#64748b; padding:20px;">暂无画像数据（对话次数不足）</p>';
                     return;
                 }
 
                 const dim = data.profile.dimensions || {};
-                document.getElementById('modalBody').innerHTML = `
-                    <div class="psych-grid">
-                        <div class="psych-item"><div class="label">共情度 (Empathy)</div><div class="value">${(dim.empathy || 0).toFixed(2)}</div></div>
-                        <div class="psych-item"><div class="label">好奇心 (Curiosity)</div><div class="value">${(dim.curiosity || 0).toFixed(2)}</div></div>
-                        <div class="psych-item"><div class="label">犹豫度 (Hesitation)</div><div class="value">${(dim.hesitation || 0).toFixed(2)}</div></div>
-                        <div class="psych-item"><div class="label">掌控欲 (Control)</div><div class="value">${(dim.control || 0).toFixed(2)}</div></div>
-                        <div class="psych-item"><div class="label">学术性 (Scholarly)</div><div class="value">${(dim.scholarly || 0).toFixed(2)}</div></div>
-                        <div class="psych-item"><div class="label">参与度 (Engagement)</div><div class="value">${(dim.engagement || 0).toFixed(2)}</div></div>
+                const confidence = Math.round((data.profile.confidence || 0) * 100);
+                
+                // 1. 生成雷达图 HTML
+                let html = `
+                    <div class="psych-chart-container">
+                        <div class="chart-wrapper">
+                            <canvas id="psychRadarChart"></canvas>
+                        </div>
                     </div>
-                    <p style="text-align:center; margin-top:20px; font-size:13px; color:#64748b;">
-                        数据置信度：${((data.profile.confidence || 0) * 100).toFixed(0)}% (已采样 ${data.profile.sample_count || 0} 次)
-                    </p>
                 `;
+
+                // 2. 生成心理评估和诊疗建议
+                if (confidence < 30) {
+                    html += `
+                        <div class="report-box warning">
+                            <h4>置信度不足 (${confidence}%)</h4>
+                            <p>该成员与苏轼的对话轮数太少，采样数据不足（当前 ${data.profile.sample_count || 0} 次）。此时的数据波动极大，不具备参考价值，建议鼓励其多与 AI 互动后再行查看。</p>
+                        </div>
+                    `;
+                } else {
+                    // 阈值设定：>0.65为高，<0.35为低
+                    const isHigh = (val) => (val || 0) > 0.65;
+                    const isLow = (val) => (val || 0) < 0.35;
+                    
+                    let evalText = [];
+                    let adviceText = [];
+
+                    // 共情 (Empathy) vs 掌控 (Control)
+                    if (isHigh(dim.empathy) && isHigh(dim.control)) {
+                        evalText.push("外柔内刚型：表面上能体谅他人，但内心有极强的主见和控制欲。");
+                        adviceText.push("在团队协作中，需注意避免表面顺从实则固执己见。建议在分配任务时明确权责边界。");
+                    } else if (isHigh(dim.control) && isLow(dim.empathy)) {
+                        evalText.push("强势主导型：极度渴望掌控话语权，对他人感受关注度低。");
+                        adviceText.push("【预警】该成员可能有较强的攻击性或自私倾向。作为管理者，需引导其学习倾听，避免团队内产生冲突。");
+                    } else if (isHigh(dim.empathy) && isLow(dim.control)) {
+                        evalText.push("温顺配合型：善解人意，愿意服从安排，但在团队中缺乏主见。");
+                        adviceText.push("适合执行明确指派的任务。建议管理者多给予正向鼓励，激发其主动表达意见。");
+                    }
+
+                    // 好奇 (Curiosity) vs 犹豫 (Hesitation)
+                    if (isHigh(dim.curiosity) && isHigh(dim.hesitation)) {
+                        evalText.push("谨慎探索型：好奇心重，但行动前顾虑极多，容易内耗。");
+                        adviceText.push("该成员在创新任务中会想很多，但落地慢。建议多给予确定性的反馈，减少其焦虑感。");
+                    } else if (isHigh(dim.curiosity) && isLow(dim.hesitation)) {
+                        evalText.push("激进猎奇型：思维活跃，敢于尝试，但可能缺乏深思熟虑。");
+                        adviceText.push("适合开拓型、高挑战的任务，但在关键决策时需要管理者帮忙把关风险。");
+                    } else if (isLow(dim.curiosity) && isHigh(dim.hesitation)) {
+                        evalText.push("保守内敛型：喜欢安稳，不愿改变，做事小心谨慎。");
+                        adviceText.push("适合常规性、需要极高准确率的维护工作，不适宜频繁变动岗位。");
+                    }
+
+                    // 学术/参与度
+                    if (isHigh(dim.scholarly)) evalText.push("具备较高的求知欲与学术倾向。");
+                    if (isLow(dim.engagement)) evalText.push("当前参与度较低，可能处于疲劳期或对话题不感兴趣。");
+
+                    // 兜底
+                    if (evalText.length === 0) {
+                        evalText.push("心理状态均衡：各项指标处于健康区间，未表现出明显的极端倾向。");
+                        adviceText.push("该成员心理状态稳定，继续保持当前节奏即可。");
+                    }
+
+                    html += `
+                        <div class="report-box">
+                            <h4>心理评估 (数据置信度: ${confidence}%)</h4>
+                            <p>${evalText.join(' ')}</p>
+                        </div>
+                        <div class="report-box advice">
+                            <h4>诊疗与管理建议</h4>
+                            <p>${adviceText.join(' ')}</p>
+                        </div>
+                    `;
+                }
+
+                document.getElementById('modalBody').innerHTML = html;
+
+                // 3. 渲染 Chart.js 雷达图
+                const ctx = document.getElementById('psychRadarChart').getContext('2d');
+                
+                // 销毁旧图表
+                if (psychChartInstance) psychChartInstance.destroy();
+
+                psychChartInstance = new Chart(ctx, {
+                    type: 'radar',
+                    data: {
+                        labels: ['共情度', '好奇心', '犹豫度', '掌控欲', '学术性', '参与度'],
+                        datasets: [{
+                            label: '心理维度',
+                            data: [
+                                dim.empathy || 0,
+                                dim.curiosity || 0,
+                                dim.hesitation || 0,
+                                dim.control || 0,
+                                dim.scholarly || 0,
+                                dim.engagement || 0
+                            ],
+                            backgroundColor: 'rgba(59, 130, 246, 0.2)', // 蓝色半透明
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+                            pointBorderColor: '#fff',
+                            pointHoverBackgroundColor: '#fff',
+                            pointHoverBorderColor: 'rgba(59, 130, 246, 1)',
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            r: {
+                                angleLines: { color: '#e2e8f0' },
+                                grid: { color: '#e2e8f0' },
+                                pointLabels: { font: { size: 13, family: 'sans-serif' }, color: '#334155' },
+                                ticks: { display: false, min: 0, max: 1 } // 隐藏刻度数字，固定0-1
+                            }
+                        },
+                        plugins: {
+                            legend: { display: false } // 隐藏图例
+                        }
+                    }
+                });
+
             } catch (err) {
-                document.getElementById('modalBody').innerHTML = `<p style="color:red; text-align:center;">拉取失败: ${err.message}</p>`;
+                document.getElementById('modalBody').innerHTML = `<p style="color:red; text-align:center; padding:20px;">拉取失败: ${err.message}</p>`;
             }
         }
     </script>
