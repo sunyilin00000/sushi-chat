@@ -150,7 +150,7 @@
         }
 
         .hidden { display: none !important; }
-        .error-msg { color: #ef4444; font-size: 14px; margin-top: 10px; text-align: center; }
+        .error-msg { color: #ef4444; font-size: 14px; margin-top: 10px; text-align: center; word-break: break-all; }
     </style>
 </head>
 <body>
@@ -259,9 +259,19 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: action, ...data })
                 });
-                const result = await res.json();
-                if (!res.ok || (result.error && result.error !== '')) {
-                    throw new Error(result.error || result.message || "请求失败");
+                
+                let result;
+                try {
+                    result = await res.json();
+                } catch (e) {
+                    throw new Error("服务器返回了非 JSON 格式数据，请检查 SCF 后端");
+                }
+
+                if (!res.ok) {
+                    throw new Error(result.error || result.message || `HTTP错误: ${res.status}`);
+                }
+                if (result.error) {
+                    throw new Error(result.error);
                 }
                 return result;
             } catch (err) {
@@ -283,14 +293,14 @@
             }
         }
 
-        // 登录
+        // 登录 (修复崩溃问题)
         async function handleLogin() {
             const btn = event.target;
             const errDiv = document.getElementById('loginError');
-            const username = document.getElementById('loginUsername').value.trim();
+            const usernameInput = document.getElementById('loginUsername').value.trim();
             const password = document.getElementById('loginPassword').value.trim();
             
-            if (!username || !password) {
+            if (!usernameInput || !password) {
                 errDiv.innerText = "请输入账号和密码";
                 return;
             }
@@ -300,14 +310,29 @@
             errDiv.innerText = "";
 
             try {
-                const data = await apiCall('login', { username, password });
-                currentToken = data.token;
-                currentUser = { username: data.username, name: data.name, role: data.role };
+                const resData = await apiCall('login', { username: usernameInput, password });
+                
+                // 兼容多种返回格式，尝试提取 token
+                const userData = resData.data || resData;
+                const token = userData.token || resData.token;
+                
+                if (!token) {
+                    throw new Error("登录失败：后台未返回 token 字段");
+                }
+
+                currentToken = token;
+                // 直接使用输入的账号作为 username，防止后端未返回该字段导致崩溃
+                currentUser = { 
+                    username: usernameInput, 
+                    name: userData.name || usernameInput, 
+                    role: userData.role || 'member' 
+                };
+                
                 localStorage.setItem('xh_token', currentToken);
                 localStorage.setItem('xh_user', JSON.stringify(currentUser));
                 showMainView();
             } catch (err) {
-                errDiv.innerText = err.message || "账号或密码错误";
+                errDiv.innerText = err.message || "登录失败，请检查账号密码";
             } finally {
                 btn.innerText = "登录";
                 btn.disabled = false;
@@ -320,10 +345,10 @@
             const errDiv = document.getElementById('regError');
             const invite_code = document.getElementById('regInviteCode').value.trim();
             const display_name = document.getElementById('regDisplayName').value.trim();
-            const username = document.getElementById('regUsername').value.trim();
+            const usernameInput = document.getElementById('regUsername').value.trim();
             const password = document.getElementById('regPassword').value.trim();
 
-            if (!invite_code || !display_name || !username || !password) {
+            if (!invite_code || !display_name || !usernameInput || !password) {
                 errDiv.innerText = "请填写所有注册信息";
                 return;
             }
@@ -333,9 +358,22 @@
             errDiv.innerText = "";
 
             try {
-                const data = await apiCall('register', { invite_code, display_name, username, password });
-                currentToken = data.token;
-                currentUser = { username: data.username, name: data.name, role: data.role };
+                const resData = await apiCall('register', { invite_code, display_name, username: usernameInput, password });
+                
+                const userData = resData.data || resData;
+                const token = userData.token || resData.token;
+
+                if (!token) {
+                    throw new Error("注册成功但未返回 token，请联系管理员");
+                }
+
+                currentToken = token;
+                currentUser = { 
+                    username: usernameInput, 
+                    name: display_name, 
+                    role: userData.role || 'member' 
+                };
+                
                 localStorage.setItem('xh_token', currentToken);
                 localStorage.setItem('xh_user', JSON.stringify(currentUser));
                 showMainView();
@@ -355,6 +393,8 @@
             currentUser = null;
             document.getElementById('mainView').classList.add('hidden');
             document.getElementById('authView').classList.remove('hidden');
+            // 清空密码框
+            document.getElementById('loginPassword').value = '';
         }
 
         // 显示主界面
@@ -395,7 +435,7 @@
             const list = document.getElementById('taskList');
             list.innerHTML = '<p style="text-align:center; color:var(--text-light);">加载中...</p>';
             try {
-                const data = await apiCall('my_tasks', { token: currentToken });
+                const data = await apiCall('my_tasks', { token: currentToken, username: currentUser.username });
                 const tasks = data.tasks || [];
                 if (tasks.length === 0) {
                     list.innerHTML = '<p style="text-align:center; color:var(--text-light);">暂无任务</p>';
@@ -433,7 +473,7 @@
             }
             input.disabled = true;
             try {
-                await apiCall('submit_task', { token: currentToken, task_id: taskId, content: content });
+                await apiCall('submit_task', { token: currentToken, task_id: taskId, content: content, username: currentUser.username });
                 alert("提交成功！");
                 loadMyTasks(); // 刷新列表
             } catch (err) {
@@ -447,7 +487,7 @@
             const list = document.getElementById('teamList');
             list.innerHTML = '<p style="text-align:center; color:var(--text-light);">加载中...</p>';
             try {
-                const data = await apiCall('team_progress', { token: currentToken });
+                const data = await apiCall('team_progress', { token: currentToken, username: currentUser.username });
                 const members = data.members || [];
                 if (members.length === 0) {
                     list.innerHTML = '<p style="text-align:center; color:var(--text-light);">暂无团队数据</p>';
