@@ -8,8 +8,11 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: #0a0a0f; color: #e0e0e0; height: 100vh; display: flex; flex-direction: column; }
     .chat-header { padding: 16px; background: #12121a; border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center; }
-    .chat-header h1 { font-size: 18px; color: #d4a574; }
-    .chat-header .status { font-size: 12px; color: #666; }
+    .header-left h1 { font-size: 18px; color: #d4a574; margin-bottom: 4px; }
+    /* ★ 微信级的对方正在输入 */
+    .typing-status { font-size: 12px; color: #10b981; height: 16px; display: none; animation: blink 1.5s infinite; }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    
     .chat-box { flex: 1; overflow-y: auto; padding: 16px; }
     .message { margin-bottom: 16px; max-width: 85%; display: flex; flex-direction: column; }
     .message.user { margin-left: auto; align-items: flex-end; }
@@ -18,16 +21,6 @@
     .message.user .bubble { background: #1a3a5c; color: white; border-bottom-right-radius: 4px; }
     .message.assistant .bubble { background: #1a1a24; color: #d4a574; border: 1px solid #2a2a3a; border-bottom-left-radius: 4px; }
     
-    /* 正在输入动画 */
-    .typing-indicator { display: flex; align-items: center; gap: 4px; height: 24px; padding: 0 5px; }
-    .typing-indicator span { display: block; width: 6px; height: 6px; background-color: #d4a574; border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; }
-    .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
-    .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
-    @keyframes bounce {
-      0%, 80%, 100% { transform: scale(0); opacity: 0.5; }
-      40% { transform: scale(1); opacity: 1; }
-    }
-
     .perception { font-size: 12px; color: #888; margin-top: 4px; font-style: italic; }
     .input-area { padding: 12px 16px; background: #12121a; border-top: 1px solid #222; display: flex; gap: 8px; }
     .input-area input { flex: 1; padding: 12px; background: #1a1a24; border: 1px solid #333; border-radius: 8px; color: white; font-size: 15px; }
@@ -42,23 +35,26 @@
 </head>
 <body>
   <div class="chat-header">
-    <h1>夜谈 · 苏轼</h1>
+    <div class="header-left">
+      <h1>夜谈 · 苏轼</h1>
+      <div class="typing-status" id="typingStatus">对方正在输入...</div>
+    </div>
     <div style="display:flex; gap:10px; align-items:center;">
-      <span class="status" id="status">执念值: 100</span>
-      <button class="new-session-btn" onclick="startNewSession()">新的一局</button>
+      <!-- 去掉了执念值，把“新的一局”改成了“清空对话” -->
+      <button class="new-session-btn" onclick="startNewSession()">清空对话</button>
       <button class="new-session-btn" onclick="location.href='member.html'">返回</button>
     </div>
   </div>
   <div class="chat-box" id="chatBox"></div>
   <div class="input-area">
-    <input type="text" id="input" placeholder="对苏轼说些什么..." onkeydown="if(event.key==='Enter')sendMessage()">
+    <input type="text" id="input" placeholder="发消息..." onkeydown="if(event.key==='Enter')sendMessage()">
     <button id="sendBtn" onclick="sendMessage()">发送</button>
   </div>
   <div id="terminalOverlay" class="terminal-overlay hidden">
-    <h2>他不再回应了。</h2>
+    <h2>对方已离线。</h2>
     <div class="terminal-stats" id="terminalStats"></div>
     <br>
-    <button class="new-session-btn" onclick="restart()" style="padding:12px 24px; font-size:16px;">新的一局</button>
+    <button class="new-session-btn" onclick="restart()" style="padding:12px 24px; font-size:16px;">重新开始</button>
   </div>
 
   <script>
@@ -83,6 +79,7 @@
     const chatBox = document.getElementById("chatBox");
     const input = document.getElementById("input");
     const sendBtn = document.getElementById("sendBtn");
+    const typingStatus = document.getElementById("typingStatus");
 
     input.addEventListener("focus", () => { inputStartTime = Date.now(); });
     input.addEventListener("blur", () => { if (input.value.length > 0) focusBlurCount++; });
@@ -99,7 +96,7 @@
       div.innerHTML = html;
       chatBox.appendChild(div);
       chatBox.scrollTop = chatBox.scrollHeight;
-      return div; // 返回 DOM 以便后续替换
+      return div;
     }
 
     function escapeHtml(text) {
@@ -149,7 +146,7 @@
     }
 
     function startNewSession() {
-      if (!confirm("开始新的一局？上一局的执念值将重置。")) return;
+      if (!confirm("确定要清空当前对话，重新开始吗？")) return;
       input.value = "新的一局";
       sendMessage();
     }
@@ -183,17 +180,8 @@
       focusBlurCount = 0;
       sendBtn.disabled = true;
 
-      // ★ 核心新增：显示“对方正在输入”的动画占位气泡
-      const typingBubble = document.createElement("div");
-      typingBubble.className = "message assistant";
-      typingBubble.innerHTML = `
-        <div class="bubble" style="padding: 10px 16px;">
-          <div class="typing-indicator">
-            <span></span><span></span><span></span>
-          </div>
-        </div>`;
-      chatBox.appendChild(typingBubble);
-      chatBox.scrollTop = chatBox.scrollHeight;
+      // ★ 显示微信级“对方正在输入”
+      typingStatus.style.display = "block";
 
       try {
         const response = await fetch(API_BASE, {
@@ -208,19 +196,13 @@
 
         const data = await response.json();
         
-        // ★ 收到回复后，移除打字动画气泡
-        typingBubble.remove();
-
         if (!response.ok) {
            throw new Error(data.error || `请求失败(${response.status})`);
         }
 
         if (data.state === "terminal") {
           document.getElementById("terminalStats").innerHTML = `
-            对话轮数: ${data.session_stats?.total_questions || 0}<br>
-            尖锐提问: ${data.session_stats?.force_count || 0} 次<br>
-            犹豫次数: ${data.session_stats?.hesitation_count || 0} 次<br>
-            <br>${data.session_stats?.ending_variant || ""}
+            对方已结束对话。
           `;
           document.getElementById("terminalOverlay").classList.remove("hidden");
           saveHistory("assistant", "……");
@@ -229,15 +211,11 @@
           if (!data.reply) throw new Error("后端返回空数据");
           addMessage("assistant", data.reply, data.perception);
           saveHistory("assistant", data.reply);
-          if (data.obsession !== undefined) {
-            document.getElementById("status").textContent = `执念值: ${data.obsession}`;
-          }
         }
       } catch (err) {
-        // ★ 出错时也要移除动画气泡
-        typingBubble.remove();
         addMessage("assistant", `[系统提示] ${err.message}`);
       } finally {
+        typingStatus.style.display = "none";
         sendBtn.disabled = false;
         input.focus();
       }
