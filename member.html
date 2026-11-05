@@ -6,7 +6,8 @@
   <title>星环终端 - 工作台</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f5f5; color: #333; }
+    body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: #f5f5f5; color: #333;
+           -webkit-tap-highlight-color: rgba(0,0,0,0); }
     .header { background: #1F2A44; color: white; padding: 20px; text-align: center; }
     .header h1 { font-size: 20px; margin-bottom: 4px; }
     .header p { font-size: 13px; opacity: 0.8; }
@@ -26,8 +27,11 @@
     .form-group input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; }
     .btn { width: 100%; padding: 14px; background: #1F2A44; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
     .tabs { display: flex; border-bottom: 2px solid #eee; margin-bottom: 16px; }
-    .tab { flex: 1; text-align: center; padding: 12px; cursor: pointer; color: #666; border-bottom: 2px solid transparent; margin-bottom: -2px; }
-    .tab.active { color: #1F2A44; border-bottom-color: #1F2A44; font-weight: bold; }
+    .tab { flex: 1; text-align: center; padding: 16px 12px; cursor: pointer; color: #666;
+           border-bottom: 2px solid transparent; margin-bottom: -2px; font-size: 16px;
+           user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+    .tab.active { color: #1F2A44; border-bottom-color: #1F2A44; font-weight: bold;
+                  background: #eef1f7; border-radius: 8px 8px 0 0; }
     .hidden { display: none !important; }
   </style>
 </head>
@@ -41,8 +45,8 @@
     <div id="loginSection" class="card">
       <h2 style="margin-bottom: 16px; color: #1F2A44;">成员登录</h2>
       <div class="tabs">
-        <div class="tab active" onclick="switchTab('login')">登录</div>
-        <div class="tab" onclick="switchTab('register')">首次注册</div>
+        <div class="tab active" onclick="switchTab(this, 'login')">登录</div>
+        <div class="tab" onclick="switchTab(this, 'register')">首次注册</div>
       </div>
       
       <div id="loginForm">
@@ -118,11 +122,11 @@
     const TEAM_API = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com";
     let token = localStorage.getItem("xinghuan_token");
     let userRole = localStorage.getItem("xinghuan_role");
-    let userDept = localStorage.getItem("xinghuan_dept");   // 记录部门，用于内外隔离
+    let userDept = localStorage.getItem("xinghuan_dept");
 
-    function switchTab(tab) {
+    function switchTab(el, tab) {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      event.target.classList.add('active');
+      el.classList.add('active');
       document.getElementById('loginForm').classList.toggle('hidden', tab !== 'login');
       document.getElementById('registerForm').classList.toggle('hidden', tab !== 'register');
     }
@@ -177,7 +181,6 @@
       document.getElementById("menuSection").classList.remove("hidden");
       document.getElementById("userInfo").textContent = `${name} | 星环终端`;
       
-      // 内外隔离：外部测试账号不显示团队看板入口
       if (dept === "外部测试") {
         document.getElementById("teamBoardBtn").classList.add("hidden");
       }
@@ -188,7 +191,8 @@
 
     function goChat() { window.location.href = "chat.html"; }
     function goTeamBoard() { window.location.href = "team.html"; }
-    function goTasks() { alert("KPI 功能开发中，请稍后在 admin.html 查看（或刷新页面）"); }
+    // 【改】直接跳转到真正的 KPI 页面
+    function goTasks() { window.location.href = "tasks.html"; }
     function goAdmin() { window.location.href = "admin.html"; }
 
     async function copyCalendarLink() {
@@ -218,6 +222,11 @@
           localStorage.clear();
         }
       });
+    }
+
+    if (location.hash === "#register") {
+      const tabs = document.querySelectorAll('.tab');
+      if (tabs.length >= 2) switchTab(tabs[1], 'register');
     }
   </script>
 </body>
