@@ -20,7 +20,6 @@
         .top-bar button { background: transparent; border: 1px solid var(--gold-dim); color: var(--gold);
                           padding: 7px 16px; font-size: 12px; letter-spacing: 2px; cursor: pointer; font-family: inherit; }
         .top-bar button:hover { background: var(--gold); color: #000; }
-
         #msgList { flex: 1; overflow-y: auto; padding: 20px; max-width: 860px; width: 100%; margin: 0 auto; }
         .msg { margin-bottom: 16px; }
         .msg .who { font-size: 13px; font-weight: 600; color: var(--gold); margin-bottom: 4px; letter-spacing: 1px; }
@@ -33,7 +32,6 @@
                          color: var(--gold); cursor: pointer; font-size: 13px; }
         .msg .file-btn:hover { background: var(--gold); color: #000; }
         .sys-line { text-align: center; color: var(--muted); font-size: 11px; letter-spacing: 2px; margin: 14px 0; }
-
         .input-zone { border-top: 1px solid var(--line); background: var(--panel); padding: 12px 20px; position: relative; }
         .input-row { display: flex; gap: 8px; max-width: 860px; margin: 0 auto; align-items: flex-end; }
         #msgInput { flex: 1; padding: 12px; background: var(--panel2); border: 1px solid var(--line);
@@ -80,9 +78,63 @@
         if (!token) location.href = 'member.html';
         let myName = '';
         try { myName = JSON.parse(localStorage.getItem('xh_user') || '{}').username || ''; } catch (e) {}
-        let roster = [];          // 内部成员名单（@补全）
-        let lastId = '';          // 轮询去重
+        let roster = [];
+        let lastId = '';
         let recorder = null, recording = false, voiceChunks = [];
+
+        // ★ 分片上传（与会议端同一约定：单片直传，大文件切 600KB 分片）
+        const CHUNK = 600 * 1024;
+        function blobToB64(blob) {
+            return new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.readAsDataURL(blob); });
+        }
+        async function uploadAny(file) {
+            if (file.size <= CHUNK) {
+                const b64 = await blobToB64(file);
+                const up = await apiCall('meeting_file_upload', { filename: file.name, content_b64: b64 });
+                return { name: up.name, path: up.path };
+            }
+            if (file.size > 4 * 1024 * 1024) throw new Error('文件超过 4MB，请压缩后上传');
+            const n = Math.ceil(file.size / CHUNK);
+            const upid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+            const safeBase = file.name.replace(/[^\w.\-一-龥]/g, '_').slice(0, 40);
+            for (let i = 0; i < n; i++) {
+                const b64 = await blobToB64(file.slice(i * CHUNK, (i + 1) * CHUNK));
+                await apiCall('meeting_file_upload', { filename: `${i}of${n}__${upid}__${safeBase}`, content_b64: b64 });
+            }
+            return { name: safeBase, path: null, upid: upid, parts: n };
+        }
+        // 下载（含分片拼合）
+        async function fetchBlob(filePayload) {
+            if (!filePayload.upid) {
+                const d = await apiCall('meeting_file_download', { path: filePayload.path });
+                return b64ToBlob(d.content_b64);
+            }
+            const d = await apiCall('meeting_file_list');
+            const parts = (d.files || []).map(f => ({ f, p: parsePartName(f.name) }))
+                .filter(x => x.p && x.p.upid === filePayload.upid).sort((a, b) => a.p.i - b.p.i);
+            if (!parts.length) throw new Error('找不到文件分片');
+            const arrays = [];
+            for (const x of parts) {
+                const dd = await apiCall('meeting_file_download', { path: x.f.path });
+                arrays.push(b64ToU8(dd.content_b64));
+            }
+            const total = arrays.reduce((a, b) => a + b.length, 0);
+            const all = new Uint8Array(total);
+            let off = 0;
+            arrays.forEach(a => { all.set(a, off); off += a.length; });
+            return new Blob([all]);
+        }
+        function parsePartName(name) {
+            const m = String(name).match(/^(\d+)of(\d+)__(\w+)__/);
+            return m ? { i: Number(m[1]), n: Number(m[2]), upid: m[3] } : null;
+        }
+        function b64ToU8(b64) {
+            const bin = atob(b64);
+            const arr = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+            return arr;
+        }
+        function b64ToBlob(b64) { return new Blob([b64ToU8(b64)]); }
 
         function apiCall(action, dataParams) {
             const body = { action, token };
@@ -97,7 +149,6 @@
             return escapeHtml(s).replace(/@([A-Za-z0-9_一-龥]+)/g, '<span class="at">@$1</span>');
         }
 
-        // ---------- 消息渲染 ----------
         function renderMsg(m) {
             const list = document.getElementById('msgList');
             const div = document.createElement('div');
@@ -105,9 +156,9 @@
             div.className = 'msg ' + cls;
             let bodyHtml = '';
             if (m.type === 'voice' && m.file) {
-                bodyHtml = `<span class="file-btn" onclick="playVoice('${m.file.path}')">播放语音消息</span>`;
+                bodyHtml = `<span class="file-btn" onclick='playVoice(${JSON.stringify(m.file)})'>播放语音消息</span>`;
             } else if (m.type === 'file' && m.file) {
-                bodyHtml = `<span class="file-btn" onclick="downloadFile('${m.file.path}', '${escapeHtml(m.file.name)}')">${escapeHtml(m.file.name)}</span>`;
+                bodyHtml = `<span class="file-btn" onclick='downloadFile(${JSON.stringify(m.file)})'>${escapeHtml(m.file.name)}</span>`;
             } else {
                 bodyHtml = highlightAt(m.text);
             }
@@ -124,18 +175,16 @@
             list.appendChild(div);
         }
 
-        // ---------- 轮询 ----------
+        let pollTimer = null;
         async function poll() {
             try {
                 const d = await apiCall('group_history');
                 const list = document.getElementById('msgList');
-                const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
                 if (d.messages && d.messages.length) {
                     const fresh = d.messages.filter(m => m.id > lastId);
                     if (fresh.length && !lastId) list.innerHTML = '';
                     fresh.forEach(m => {
                         renderMsg(m);
-                        // @我 或 @全体 提示
                         if (m.from !== myName && m.mentions &&
                             (m.mentions.indexOf('ALL') > -1 || m.mentions.indexOf(myName) > -1)) {
                             sysLine('【提示】' + m.from + ' 提及了你');
@@ -152,13 +201,10 @@
                 }
             }
         }
-        let pollTimer = setInterval(poll, 3000);
 
-        // ---------- 发送 ----------
         async function send(text, type, file, mentions) {
-            try {
-                const d = await apiCall('group_send', { text, type: type || 'text', file: file || null, mentions: mentions || extractMentions(text || '') });
-            } catch (e) { sysLine('【发送失败】' + e.message); }
+            try { await apiCall('group_send', { text, type: type || 'text', file: file || null, mentions: mentions || extractMentions(text || '') }); }
+            catch (e) { sysLine('【发送失败】' + e.message); }
         }
         function extractMentions(text) {
             const ms = [];
@@ -180,7 +226,6 @@
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); }
         });
 
-        // ---------- @补全 ----------
         input.addEventListener('input', function () {
             const dd = document.getElementById('atDropdown');
             const m = input.value.match(/@([A-Za-z0-9_一-龥]*)$/);
@@ -200,7 +245,6 @@
             input.focus();
         }
 
-        // ---------- 语音消息 ----------
         document.getElementById('btnVoice').onclick = async function () {
             if (recording) { recorder.stop(); return; }
             try {
@@ -214,12 +258,10 @@
                     document.getElementById('btnVoice').classList.remove('recording');
                     document.getElementById('btnVoice').innerText = '语音';
                     const blob = new Blob(voiceChunks, { type: recorder.mimeType || 'audio/webm' });
-                    if (blob.size > 700 * 1024) { sysLine('【语音过长】请控制在 1 分钟以内'); return; }
                     sysLine('【系统】语音上传中…');
-                    const b64 = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.readAsDataURL(blob); });
                     try {
-                        const up = await apiCall('meeting_file_upload', { filename: 'voice_' + Date.now() + '.webm', content_b64: b64 });
-                        await send('', 'voice', { name: up.name, path: up.path });
+                        const up = await uploadAny(new File([blob], 'voice_' + Date.now() + '.webm'));
+                        await send('', 'voice', up);
                     } catch (e) { sysLine('【发送失败】' + e.message); }
                 };
                 recorder.start();
@@ -229,50 +271,40 @@
             } catch (e) { sysLine('【无法录音】' + e.message); }
         };
 
-        // ---------- 文件消息 ----------
         document.getElementById('btnFile').onclick = () => document.getElementById('fileInput').click();
         document.getElementById('fileInput').onchange = async function () {
             const f = this.files[0];
             this.value = '';
             if (!f) return;
-            if (f.size > 700 * 1024) { sysLine('【文件过大】群文件请控制在 700KB 以内'); return; }
-            const b64 = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.readAsDataURL(f); });
+            sysLine('【系统】文件上传中…');
             try {
-                const up = await apiCall('meeting_file_upload', { filename: f.name, content_b64: b64 });
-                await send(f.name, 'file', { name: up.name, path: up.path });
+                const up = await uploadAny(f);
+                await send(f.name, 'file', up);
             } catch (e) { sysLine('【发送失败】' + e.message); }
         };
 
-        // ---------- 播放 / 下载 ----------
-        async function playVoice(path) {
+        async function playVoice(filePayload) {
             try {
-                const d = await apiCall('meeting_file_download', { path });
-                const bin = atob(d.content_b64);
-                const arr = new Uint8Array(bin.length);
-                for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-                const audio = new Audio(URL.createObjectURL(new Blob([arr])));
-                audio.play();
+                const blob = await fetchBlob(filePayload);
+                new Audio(URL.createObjectURL(blob)).play();
             } catch (e) { sysLine('【播放失败】' + e.message); }
         }
-        async function downloadFile(path, name) {
+        async function downloadFile(filePayload) {
             try {
-                const d = await apiCall('meeting_file_download', { path });
-                const bin = atob(d.content_b64);
-                const arr = new Uint8Array(bin.length);
-                for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+                const blob = await fetchBlob(filePayload);
                 const a = document.createElement('a');
-                a.href = URL.createObjectURL(new Blob([arr]));
-                a.download = name; a.click();
+                a.href = URL.createObjectURL(blob);
+                a.download = filePayload.name; a.click();
             } catch (e) { sysLine('【下载失败】' + e.message); }
         }
 
-        // ---------- 初始化 ----------
         (async function init() {
             try {
                 const r = await apiCall('internal_roster');
                 roster = r.members || [];
-            } catch (e) { /* 无权时轮询会兜底 */ }
+            } catch (e) {}
             poll();
+            pollTimer = setInterval(poll, 3000);
         })();
     </script>
 </body>
