@@ -1,27 +1,21 @@
 // meeting-boot.js
-// 作用：会议初始化——登录检查 → 输入会议密钥 → 加载SDK → 校验密钥并拿UserSig → 进房 → 开摄像头麦 → 广播 ready
+// 会议初始化——登录检查 → 会议密钥 → 加载SDK → 校验并拿UserSig → 进房 → 开摄像头麦 → 广播 ready
 document.addEventListener('DOMContentLoaded', async function () {
   const TEAM_API = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com";
 
   try {
-    // 检查登录
     const token = localStorage.getItem('xh_token');
     if (!token) { location.href = 'member.html'; return; }
 
-    // ★ 房间号提前算出来，密钥弹窗要用
     const roomId = new URLSearchParams(location.search).get('room') || '101';
-
-    // ★ 输入会议密钥（房间未设密钥时直接点"确定"即可跳过）
     const roomKey = prompt('请输入房间 ' + roomId + ' 的会议密钥（未设置则留空直接确定）', '') || '';
 
-    // 容错加载 SDK
     const TRTC = await window.loadTRTC();
     if (!(await TRTC.isSupported())) {
       alert('当前浏览器不支持 WebRTC，请使用最新版 Chrome 或 Edge');
       return;
     }
 
-    // ★ 获取 UserSig：后端会校验 roomKey，密钥错误直接返回 403
     const resp = await fetch(TEAM_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -31,9 +25,15 @@ document.addEventListener('DOMContentLoaded', async function () {
     const sigData = await resp.json();
     if (sigData.error) throw new Error('获取 UserSig 失败: ' + sigData.error);
 
+    // ★ 显示会议名称（管理台设置，经 get_trtc_sig 返回）
+    const roomName = sigData.roomName || '';
+    if (roomName) {
+      document.getElementById('meetingName').innerText = roomName;
+      document.title = roomName + ' · 星环终端';
+    }
+
     const trtc = TRTC.create();
 
-    // 远端用户进房：建格子
     trtc.on(TRTC.EVENT.REMOTE_USER_ENTER, function (event) {
       const wall = document.getElementById('remote-videos');
       if (wall && !document.getElementById('cell-' + event.userId)) {
@@ -44,7 +44,6 @@ document.addEventListener('DOMContentLoaded', async function () {
       }
     });
 
-    // 区分普通视频流和屏幕共享流
     trtc.on(TRTC.EVENT.REMOTE_VIDEO_AVAILABLE, function (event) {
       if (event.streamType === TRTC.TYPE.STREAM_TYPE_SUB) {
         const big = document.getElementById('bigscreen');
@@ -75,7 +74,6 @@ document.addEventListener('DOMContentLoaded', async function () {
       location.href = 'member.html';
     });
 
-    // 进房
     await trtc.enterRoom({
       sdkAppId: sigData.sdkAppId,
       userId: sigData.userId,
@@ -83,7 +81,6 @@ document.addEventListener('DOMContentLoaded', async function () {
       roomId: Number(roomId)
     });
 
-    // 强制摄像头/麦克风
     try {
       await trtc.startLocalVideo({ view: 'local-video' });
       await trtc.startLocalAudio();
@@ -93,7 +90,6 @@ document.addEventListener('DOMContentLoaded', async function () {
       return;
     }
 
-    // 暴露控制接口
     window.meeting = {
       trtc: trtc, TRTC: TRTC,
       userId: sigData.userId, roomId: Number(roomId),
