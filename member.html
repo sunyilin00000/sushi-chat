@@ -7,14 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
-            --primary: #1e293b;
-            --bg: #f1f5f9;
-            --card-bg: #ffffff;
-            --text: #334155;
-            --text-light: #64748b;
-            --border: #e2e8f0;
-            --accent: #3b82f6;
-            --danger: #ef4444;
+            --primary: #1e293b; --bg: #f1f5f9; --card-bg: #ffffff; --text: #334155; --text-light: #64748b; --border: #e2e8f0; --accent: #3b82f6; --danger: #ef4444;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: var(--bg); color: var(--text); }
@@ -27,6 +20,8 @@
         .nav-item.active { background: var(--primary); color: white; }
         .nav-item.admin-btn { color: var(--danger); font-weight: bold; }
         .nav-item.admin-btn:hover { background: #fee2e2; }
+        .nav-item.meeting-btn { color: #10b981; font-weight: bold; }
+        .nav-item.meeting-btn:hover { background: #d1fae5; }
         .nav-item.logout { color: var(--text-light); margin-left: auto; }
         .container { max-width: 800px; margin: 0 auto; padding: 0 15px 50px 15px; }
         .auth-card { background: var(--card-bg); border-radius: 12px; padding: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); max-width: 400px; margin: 0 auto; }
@@ -129,6 +124,10 @@
         <div class="nav-bar">
             <div class="nav-item active" id="navTasks" onclick="switchMainTab('tasks')">我的 KPI</div>
             <div class="nav-item" id="navTeam" onclick="switchMainTab('team')">团队进度</div>
+            
+            <!-- 新增：线上会议入口 -->
+            <div class="nav-item meeting-btn" id="navMeeting" onclick="location.href='meeting.html'">进入线上会议</div>
+            
             <div class="nav-item admin-btn hidden" id="navAdmin" onclick="switchMainTab('admin')">管理控制台</div>
             <div class="nav-item logout" onclick="handleLogout()">退出登录</div>
         </div>
@@ -301,8 +300,14 @@
         function showMainView() {
             document.getElementById('authView').classList.add('hidden');
             document.getElementById('mainView').classList.remove('hidden');
-            if (currentUser && currentUser.role === 'admin') document.getElementById('navAdmin').classList.remove('hidden');
-            else document.getElementById('navAdmin').classList.add('hidden');
+            
+            // 如果是外部测试账号，隐藏线上会议入口
+            if (currentUser && currentUser.role === 'admin') {
+                document.getElementById('navAdmin').classList.remove('hidden');
+            } else {
+                document.getElementById('navAdmin').classList.add('hidden');
+            }
+
             switchMainTab('tasks');
         }
 
@@ -369,7 +374,6 @@
                 select.innerHTML = '<option value="">请选择成员...</option>';
                 membersCache.forEach(m => { select.innerHTML += `<option value="${m.username}">${m.name} (${m.department})</option>`; });
                 
-                // ★ 修改点：增加了 IP 和最后登录时间的渲染
                 list.innerHTML = membersCache.map(m => `
                     <div class="member-item">
                         <div class="member-info">
@@ -401,7 +405,7 @@
         }
 
         async function deleteMember(username, name) {
-            if (!confirm(`⚠️ 警告：确定要永久删除成员「${name}」吗？\n该操作将同时清空该成员所有的 KPI 任务、苏轼对话记录和心理画像，且不可恢复！`)) return;
+            if (!confirm(`警告：确定要永久删除成员「${name}」吗？\n该操作将同时清空该成员所有的 KPI 任务、苏轼对话记录和心理画像，且不可恢复！`)) return;
             try {
                 await apiCall('delete_member', { target_username: username }, true);
                 alert("删除成功！"); loadAdminData();
