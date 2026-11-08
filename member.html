@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>星环终端 - 团队工作台</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- ★ Chart.js 本地化：原 jsDelivr 地址在用户网络被屏蔽，会卡住整个页面 -->
+    <script src="chart.js"></script>
     <style>
         :root {
             --primary: #1e293b; --bg: #f1f5f9; --card-bg: #ffffff; --text: #334155; --text-light: #64748b; --border: #e2e8f0; --accent: #3b82f6; --danger: #ef4444;
@@ -257,7 +258,6 @@
                 const resData = await apiCall('login', { username: usernameInput, password: password, lat: loc.lat, lng: loc.lng }, false);
                 if (!resData.token) throw new Error("登录成功，但后端未返回 token");
                 currentToken = resData.token;
-                // ★ department 一并存入，用于内部功能入口显隐
                 currentUser = { username: usernameInput, name: resData.name || usernameInput, role: resData.role || 'member', department: resData.department || '外部访客' };
                 localStorage.setItem('xh_token', currentToken);
                 localStorage.setItem('xh_user', JSON.stringify(currentUser));
@@ -288,13 +288,14 @@
             finally { btn.innerText = "注册并登录"; btn.disabled = false; }
         }
 
+        // ★ 退出登录：清缓存并强制回到登录页
         function handleLogout() {
-            localStorage.removeItem('xh_token'); localStorage.removeItem('xh_user');
-            currentToken = null; currentUser = null;
-            document.getElementById('mainView').classList.add('hidden');
-            document.getElementById('authView').classList.remove('hidden');
-            document.getElementById('loginPassword').value = '';
-            document.getElementById('loginError').innerText = '';
+            localStorage.removeItem('xh_token');
+            localStorage.removeItem('xh_user');
+            currentToken = null;
+            currentUser = null;
+            if (psychChartInstance) { psychChartInstance.destroy(); psychChartInstance = null; }
+            location.reload();   // 刷新后自然停在登录界面，状态最干净
         }
 
         function showMainView() {
@@ -305,7 +306,6 @@
             } else {
                 document.getElementById('navAdmin').classList.add('hidden');
             }
-            // ★ 内部群聊入口：仅内部成员可见
             const dept = currentUser ? (currentUser.department || '') : '';
             if (dept && dept !== '外部测试' && dept !== '外部访客') {
                 document.getElementById('navGroup').classList.remove('hidden');
@@ -442,9 +442,8 @@
 
         async function viewLocation(username, name) {
             document.getElementById('modalTitle').innerText = `${name} 的最近位置`;
-            document.getElementById('modalBody').innerHTML = '<p style="text-align:center;">正在拉取位置数据...</p>';
-            document.getElementById('detailModal').classList.remove('hidden');
             document.getElementById('modalBody').innerHTML = '<p style="text-align:center; color:#64748b; padding:20px;">位置追踪功能开发中。</p>';
+            document.getElementById('detailModal').classList.remove('hidden');
         }
 
         async function viewChat(username, name) {
