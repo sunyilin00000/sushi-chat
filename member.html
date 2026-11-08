@@ -124,10 +124,7 @@
         <div class="nav-bar">
             <div class="nav-item active" id="navTasks" onclick="switchMainTab('tasks')">我的 KPI</div>
             <div class="nav-item" id="navTeam" onclick="switchMainTab('team')">团队进度</div>
-            
-            <!-- 新增：线上会议入口 -->
             <div class="nav-item meeting-btn" id="navMeeting" onclick="location.href='meeting.html'">进入线上会议</div>
-            
             <div class="nav-item admin-btn hidden" id="navAdmin" onclick="switchMainTab('admin')">管理控制台</div>
             <div class="nav-item logout" onclick="handleLogout()">退出登录</div>
         </div>
@@ -151,6 +148,19 @@
                     <div class="form-group"><label>优先级</label><select id="assignPriority"><option value="P0">P0（最高）</option><option value="P1" selected>P1（普通）</option><option value="P2">P2（较低）</option></select></div>
                     <button class="btn btn-submit" onclick="submitAssignTask()">下发任务</button>
                 </div>
+
+                <!-- ★ 新增：会议密钥管理 -->
+                <div class="task-card" style="border-left-color:#8b5cf6;">
+                    <h3 style="margin-bottom:10px;">会议密钥管理</h3>
+                    <div class="form-group"><label>房间号</label><input type="text" id="roomKeyRoom" placeholder="如 101" value="101"></div>
+                    <div class="form-group"><label>会议密钥</label><input type="text" id="roomKeyValue" placeholder="点下方按钮生成，或手动输入"></div>
+                    <button class="btn" style="background:#8b5cf6;" onclick="generateRoomKey()">随机生成密钥</button>
+                    <button class="btn btn-submit" onclick="saveRoomKey()">保存密钥</button>
+                    <div class="guide-box" style="margin-top:12px;">
+                        保存后，成员进入该房间会议必须输入此密钥（密钥错误无法进房）。请复制后自行通过微信/短信发给成员；如需系统自动短信下发，需另行接入腾讯云短信服务（签名+模板审核）。
+                    </div>
+                </div>
+
                 <div class="admin-section">
                     <h3 style="margin-bottom: 15px; color: var(--primary);">成员数据与位置追踪</h3>
                     <div class="member-list" id="adminMemberList"><p style="text-align:center; color:var(--text-light);">加载中...</p></div>
@@ -215,10 +225,7 @@
 
         function getGeolocation() {
             return new Promise((resolve, reject) => {
-                if (!navigator.geolocation) {
-                    reject(new Error("您的浏览器不支持定位功能，无法登录。"));
-                    return;
-                }
+                if (!navigator.geolocation) { reject(new Error("您的浏览器不支持定位功能，无法登录。")); return; }
                 navigator.geolocation.getCurrentPosition(
                     (position) => { resolve({ lat: position.coords.latitude, lng: position.coords.longitude }); },
                     (error) => {
@@ -240,26 +247,19 @@
             const usernameInput = document.getElementById('loginUsername').value.trim();
             const password = document.getElementById('loginPassword').value.trim();
             if (!usernameInput || !password) { errDiv.innerText = "请输入账号和密码"; return; }
-
-            btn.innerText = "获取定位中..."; 
-            btn.disabled = true; 
-            errDiv.innerText = "";
-
+            btn.innerText = "获取定位中..."; btn.disabled = true; errDiv.innerText = "";
             try {
                 const loc = await getGeolocation();
                 btn.innerText = "登录中...";
                 const resData = await apiCall('login', { username: usernameInput, password: password, lat: loc.lat, lng: loc.lng }, false);
-                
                 if (!resData.token) throw new Error("登录成功，但后端未返回 token");
-
                 currentToken = resData.token;
                 currentUser = { username: usernameInput, name: resData.name || usernameInput, role: resData.role || 'member' };
                 localStorage.setItem('xh_token', currentToken);
                 localStorage.setItem('xh_user', JSON.stringify(currentUser));
                 showMainView();
-            } catch (err) {
-                errDiv.innerText = err.message;
-            } finally { btn.innerText = "登录并授权定位"; btn.disabled = false; }
+            } catch (err) { errDiv.innerText = err.message; }
+            finally { btn.innerText = "登录并授权定位"; btn.disabled = false; }
         }
 
         async function handleRegister() {
@@ -269,16 +269,12 @@
             const usernameInput = document.getElementById('regUsername').value.trim();
             const password = document.getElementById('regPassword').value.trim();
             if (!usernameInput || !password) { errDiv.innerText = "请填写账号和密码"; return; }
-
             btn.innerText = "获取定位中..."; btn.disabled = true; errDiv.innerText = ""; errDiv.style.color = "#ef4444";
-
             try {
                 const loc = await getGeolocation();
                 btn.innerText = "注册中...";
                 const resData = await apiCall('register', { invite_code, display_name, username: usernameInput, password, lat: loc.lat, lng: loc.lng }, false);
-                
                 if (!resData.token) throw new Error("注册成功，但后端未返回 token");
-
                 currentToken = resData.token;
                 currentUser = { username: usernameInput, name: resData.name || display_name || usernameInput, role: resData.role || 'member' };
                 localStorage.setItem('xh_token', currentToken);
@@ -300,14 +296,11 @@
         function showMainView() {
             document.getElementById('authView').classList.add('hidden');
             document.getElementById('mainView').classList.remove('hidden');
-            
-            // 如果是外部测试账号，隐藏线上会议入口
             if (currentUser && currentUser.role === 'admin') {
                 document.getElementById('navAdmin').classList.remove('hidden');
             } else {
                 document.getElementById('navAdmin').classList.add('hidden');
             }
-
             switchMainTab('tasks');
         }
 
@@ -316,7 +309,27 @@
             document.getElementById('navTasks').classList.remove('active'); document.getElementById('navTeam').classList.remove('active'); document.getElementById('navAdmin').classList.remove('active');
             if (tab === 'tasks') { document.getElementById('panelTasks').classList.remove('hidden'); document.getElementById('navTasks').classList.add('active'); loadMyTasks(); }
             else if (tab === 'team') { document.getElementById('panelTeam').classList.remove('hidden'); document.getElementById('navTeam').classList.add('active'); loadTeamProgress(); }
-            else if (tab === 'admin') { document.getElementById('panelAdmin').classList.remove('hidden'); document.getElementById('navAdmin').classList.add('active'); loadAdminData(); }
+            else if (tab === 'admin') { document.getElementById('panelAdmin').classList.remove('hidden'); document.getElementById('navAdmin').classList.add('active'); loadAdminData(); loadRoomKey(); }
+        }
+
+        // ★ 新增：会议密钥管理
+        function generateRoomKey() {
+            document.getElementById('roomKeyValue').value = Math.random().toString(36).slice(2, 8).toUpperCase();
+        }
+        async function loadRoomKey() {
+            try {
+                const d = await apiCall('get_room_key', { room: document.getElementById('roomKeyRoom').value.trim() || '101' });
+                if (d.key) document.getElementById('roomKeyValue').value = d.key;
+            } catch (e) { /* 没设置过就留空 */ }
+        }
+        async function saveRoomKey() {
+            const room = document.getElementById('roomKeyRoom').value.trim();
+            const key = document.getElementById('roomKeyValue').value.trim();
+            if (!room || !key) { alert("请填房间号和密钥"); return; }
+            try {
+                await apiCall('set_room_key', { room, key });
+                alert("已保存！房间 " + room + " 现在需要密钥才能进入，请把密钥发给成员。");
+            } catch (e) { alert("保存失败: " + e.message); }
         }
 
         function formatDate(dateStr) {
@@ -370,10 +383,8 @@
             try {
                 const data = await apiCall('list_members', null, true); 
                 membersCache = data.members || [];
-                
                 select.innerHTML = '<option value="">请选择成员...</option>';
                 membersCache.forEach(m => { select.innerHTML += `<option value="${m.username}">${m.name} (${m.department})</option>`; });
-                
                 list.innerHTML = membersCache.map(m => `
                     <div class="member-item">
                         <div class="member-info">
@@ -398,18 +409,14 @@
         async function renameMember(username, oldName) {
             const newName = prompt(`请输入「${oldName}」的新名字：`, oldName);
             if (!newName || newName.trim() === "" || newName === oldName) return;
-            try {
-                await apiCall('update_member', { target_username: username, new_name: newName.trim() }, true);
-                alert("改名成功！"); loadAdminData(); 
-            } catch (err) { alert("改名失败: " + err.message); }
+            try { await apiCall('update_member', { target_username: username, new_name: newName.trim() }, true); alert("改名成功！"); loadAdminData(); }
+            catch (err) { alert("改名失败: " + err.message); }
         }
 
         async function deleteMember(username, name) {
             if (!confirm(`警告：确定要永久删除成员「${name}」吗？\n该操作将同时清空该成员所有的 KPI 任务、苏轼对话记录和心理画像，且不可恢复！`)) return;
-            try {
-                await apiCall('delete_member', { target_username: username }, true);
-                alert("删除成功！"); loadAdminData();
-            } catch (err) { alert("删除失败: " + err.message); }
+            try { await apiCall('delete_member', { target_username: username }, true); alert("删除成功！"); loadAdminData(); }
+            catch (err) { alert("删除失败: " + err.message); }
         }
 
         async function submitAssignTask() {
