@@ -4,19 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>星环终端 - 线上会议</title>
-    <!-- 换用更稳定的 CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/trtc-sdk-v5@latest/trtc-sdk-v5.js"></script>
+    <!-- 双重 CDN 保障，防止某个源抽风 -->
+    <script src="https://unpkg.zhimg.com/trtc-sdk-v5@latest/trtc-sdk-v5.js"></script>
+    <script>
+        if (typeof TRTC === 'undefined') {
+            document.write('<script src="https://cdn.jsdelivr.net/npm/trtc-sdk-v5@latest/trtc-sdk-v5.js"><\/script>');
+        }
+    </script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background-color: #0f172a; color: #fff; font-family: -apple-system, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         .header { height: 60px; background: #1e293b; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; z-index: 10; }
         .header h1 { font-size: 18px; color: #38bdf8; }
         .header .info { font-size: 14px; color: #94a3b8; }
-        
-        /* 提示条 */
         .notice-bar { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); background: rgba(239, 68, 68, 0.9); color: white; padding: 8px 20px; border-radius: 8px; font-size: 14px; display: none; z-index: 50; }
-
-        /* 视频区域 */
         .video-container { flex: 1; position: relative; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px; padding: 20px; overflow-y: auto; }
         .video-wrapper { background: #1e293b; border-radius: 12px; overflow: hidden; position: relative; width: calc(50% - 10px); aspect-ratio: 16/9; border: 1px solid #334155; }
         @media (max-width: 800px) { .video-wrapper { width: 100%; } }
@@ -24,12 +25,8 @@
         .video-wrapper.local { position: fixed; bottom: 150px; right: 20px; width: 200px; height: 150px; z-index: 20; box-shadow: 0 4px 20px rgba(0,0,0,0.5); border-color: #38bdf8; }
         .user-label { position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 4px; font-size: 12px; }
         .speaking-indicator { position: absolute; top: 10px; right: 10px; background: #22c55e; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; display: none; }
-
-        /* 字幕区域 */
         .subtitle-box { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); width: 80%; max-width: 800px; background: rgba(0,0,0,0.7); padding: 10px 20px; border-radius: 8px; text-align: center; font-size: 16px; color: #e2e8f0; z-index: 15; display: none; min-height: 44px; }
         .subtitle-box span { color: #38bdf8; font-weight: bold; }
-
-        /* 底部控制栏 */
         .controls { height: 80px; background: #1e293b; display: flex; justify-content: center; align-items: center; gap: 15px; z-index: 10; flex-wrap: wrap; }
         .btn { height: 44px; padding: 0 20px; border-radius: 8px; border: none; background: #334155; color: #fff; font-size: 14px; font-weight: bold; cursor: pointer; transition: 0.2s; }
         .btn:hover { background: #475569; }
@@ -39,8 +36,6 @@
         .btn.speak-btn.speaking { background: #ef4444; color: white; }
         .btn.leave { background: #ef4444; }
         .btn.leave:hover { background: #dc2626; }
-
-        /* 投票遮罩层 */
         .vote-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.95); z-index: 100; display: none; flex-direction: column; justify-content: center; align-items: center; padding: 40px; }
         .vote-panel { background: #1e293b; border: 2px solid #38bdf8; border-radius: 16px; width: 80%; max-width: 800px; padding: 30px; display: flex; flex-direction: column; gap: 20px; }
         .vote-panel h2 { color: #38bdf8; font-size: 24px; text-align: center; margin-bottom: 10px; }
@@ -90,9 +85,8 @@
     </div>
 
     <script>
-        // 【新增】检查 SDK 是否加载成功
         if (typeof TRTC === 'undefined') {
-            alert("腾讯会议组件加载失败，请检查网络或刷新页面重试！");
+            alert("腾讯会议组件加载失败，请检查网络或强制刷新页面重试！");
         }
 
         const TEAM_API = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com"; 
@@ -177,7 +171,6 @@
             setTimeout(() => { bar.style.display = 'none'; }, 3000);
         }
 
-        // ================== 语音转文字 ==================
         function initSpeechRecognition() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) { alert("浏览器不支持语音识别"); return; }
@@ -208,12 +201,8 @@
             }
         }
 
-        // ================== 会议室连接 ==================
         async function initMeeting() {
-            if (typeof TRTC === 'undefined') {
-                document.getElementById('roomInfo').innerText = "组件加载失败，请刷新";
-                return;
-            }
+            if (typeof TRTC === 'undefined') return;
             try {
                 const res = await fetch(TEAM_API, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -318,7 +307,6 @@
             if (trtc) { await trtc.exitRoom(); location.href = 'member.html'; }
         }
 
-        // ================== 投票功能 ==================
         let currentVote = null;
 
         function openVoteCreate() {
@@ -373,7 +361,6 @@
 
         function closeVoteOverlay() { document.getElementById('voteOverlay').style.display = 'none'; }
 
-        // 页面加载后初始化
         window.onload = () => {
             initMeeting();
         };
