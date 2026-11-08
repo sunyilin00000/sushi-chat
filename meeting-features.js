@@ -1,19 +1,20 @@
 // meeting-features.js
-// 业务功能：实时字幕（进讨论缓存）/ 屏幕共享 / 匿名表决 / 全员禁言 / 会议文件 / 常驻文字聊天 + 苏轼感知与发言
-// 黑金正式风格：界面无 emoji，系统提示用【系统】前缀
+// 业务功能：字幕 / 屏幕共享 / 匿名表决 / 全员禁言 / 会议文件 / 文字聊天（@补全）/ 苏轼感知发言 / 协同批注
 
-// ★ 管理员登录账号（其他客户端靠此名单识别管理员指令）
 const ADMIN_USERS = ['admin'];
 
 const TEAM_API = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com";
 let token = null, trtc = null, TRTC = null, myUserId = null, isAdmin = false;
 
-// ★ 会议讨论记录缓存：语音转文字 + 聊天内容都进这里，@苏轼 时作为上下文带给 AI
+// 会议讨论缓存（苏轼上下文）
 const CONV = [];
 function pushConv(who, text) {
   CONV.push(who + '：' + text);
   if (CONV.length > 30) CONV.shift();
 }
+
+// ★ 参会名单（@补全用）：自己 + 进出房事件维护
+const roster = new Set();
 
 function apiCall(action, dataParams) {
   const body = { action, token };
@@ -25,7 +26,6 @@ function sendMsg(cmdId, obj) {
   try { trtc.sendCustomMessage({ cmdId, data: new TextEncoder().encode(JSON.stringify(obj)).buffer }); }
   catch (e) { console.warn('[信令] 发送失败:', e); }
 }
-// 画面底部字幕条
 function showSubLine(text) {
   const bar = document.getElementById('subtitle-bar');
   const line = document.createElement('div');
@@ -38,6 +38,7 @@ function showSubLine(text) {
 window.addEventListener('meeting-ready', function () {
   trtc = window.meeting.trtc; TRTC = window.meeting.TRTC;
   myUserId = window.meeting.userId; token = window.meeting.token;
+  roster.add(myUserId);
   try { isAdmin = (JSON.parse(localStorage.getItem('xh_user') || '{}').role === 'admin'); } catch (e) {}
   if (isAdmin) ['btnVote', 'btnMuteAll', 'btnUnmute'].forEach(id => document.getElementById(id).classList.remove('hidden'));
 
@@ -48,10 +49,14 @@ window.addEventListener('meeting-ready', function () {
   initMuteButtons();
   initFiles();
   initChat();
+  initBoard();
   document.getElementById('btnLeave').onclick = () => window.meeting.leave();
+  // 维护名单
+  trtc.on(TRTC.EVENT.REMOTE_USER_ENTER, e => roster.add(e.userId));
+  trtc.on(TRTC.EVENT.REMOTE_USER_LEAVE, e => roster.delete(e.userId));
 });
 
-// ---------- 信令接收 ----------
+// ---------- 信令 ----------
 function initCustomMessages() {
   trtc.on(TRTC.EVENT.CUSTOM_MESSAGE, function (event) {
     let msg = {};
@@ -60,16 +65,13 @@ function initCustomMessages() {
 
     if (msg.t === 'subtitle') {
       showSubLine(msg.text);
-      if (from !== myUserId) pushConv(from, stripName(msg.text));   // 别人的语音转文字进讨论缓存
-    } else if (msg.t === 'vote_start') {
-      openVoteModal(msg);
-    } else if (msg.t === 'vote_end') {
-      closeVoteModal();
-      showVoteResult(msg.q, msg.opts, msg.counts);
-    } else if (msg.t === 'mute_all') {
+      if (from !== myUserId) pushConv(from, stripName(msg.text));
+    } else if (msg.t === 'vote_start') openVoteModal(msg);
+    else if (msg.t === 'vote_end') { closeVoteModal(); showVoteResult(msg.q, msg.opts, msg.counts); }
+    else if (msg.t === 'mute_all') {
       if (ADMIN_USERS.includes(from)) { window.meeting.muteLocalAudio(); showSubLine('【系统】管理员已开启全员禁言'); }
     } else if (msg.t === 'unmute_all') {
-      if (ADMIN_USERS.includes(from)) { window.meeting.unmuteLocalAudio(); showSubLine('【系统】管理员已解除全员禁言'); }
+      if (ADMIN_USERS.includes(from)) { window.meeting.muteLocalAudio(); showSubLine('【系统】管理员已解除全员禁言'); }
     } else if (msg.t === 'file') {
       showSubLine('【系统】' + from + ' 上传了会议文件：' + msg.name);
       refreshFileList();
@@ -78,28 +80,66 @@ function initCustomMessages() {
     } else if (msg.t === 'sushi') {
       if (from !== myUserId) { showChat('苏轼', msg.text, 'sushi'); pushConv('苏轼', msg.text); speakSushi(msg.text); }
     }
+    // ★ 批注同步
+    else if (msg.t === 'draw') { if (from !== myUserId) { applyDraw(msg); markActive(from); } }
+    else if (msg.t === 'btext') { if (from !== myUserId) { applyBoardText(msg); markActive(from); } }
+    else if (msg.t === 'bclear') { if (from !== myUserId && ADMIN_USERS.includes(from)) clearBoardCanvas(); }
+    else if (msg.t === 'bbg') { if (from !== myUserId) setBoardBg(msg.dataUrl); }
+    else if (msg.t === 'cursor') { if (from !== myUserId) showCursorTag(from, msg.x, msg.y); }
   });
 }
-// 字幕格式为 【用户名】内容，提取内容部分入缓存
-function stripName(text) { return text.replace(/^【.+?】/, ''); }
+function stripName(t) { return t.replace(/^【.+?】/, ''); }
 
-// ---------- 文字聊天（常驻右栏） ----------
+// ---------- 聊天 + @补全 ----------
 function initChat() {
   document.getElementById('btnChat').onclick = function () {
     document.getElementById('chatPanel').classList.toggle('collapsed');
   };
+  document.getElementById('btnChatToggle').onclick = function () {
+    document.getElementById('chatPanel').classList.toggle('collapsed');
+  };
   document.getElementById('btnSendChat').onclick = sendChat;
-  document.getElementById('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
-  // ★ 请苏轼基于当前讨论主动发言
+  const input = document.getElementById('chatInput');
+  input.addEventListener('input', updateAtDropdown);
+  input.addEventListener('keydown', function (e) {
+    const dd = document.getElementById('atDropdown');
+    if (dd.style.display === 'block') {
+      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); pickAt(dd.querySelector('div')); return; }
+      if (e.key === 'Escape') { dd.style.display = 'none'; return; }
+    }
+    if (e.key === 'Enter') sendChat();
+  });
   document.getElementById('btnSushiSpeak').onclick = function () {
     askSushi('请根据以上会议讨论记录，以你的视角发表一段简短意见或点评。');
   };
+}
+// ★ 输入 @ 显示成员下拉
+function updateAtDropdown() {
+  const input = document.getElementById('chatInput');
+  const dd = document.getElementById('atDropdown');
+  const m = input.value.match(/@([A-Za-z0-9_一-龥]*)$/);
+  if (!m) { dd.style.display = 'none'; return; }
+  const prefix = m[1].toLowerCase();
+  const names = [...roster, '苏轼'].filter(n => n.toLowerCase().includes(prefix));
+  if (!names.length) { dd.style.display = 'none'; return; }
+  dd.innerHTML = names.map(n =>
+    `<div data-name="${escapeHtml(n)}">${escapeHtml(n)}${n === '苏轼' ? '<span class="ai-tag">AI 成员</span>' : ''}</div>`).join('');
+  dd.querySelectorAll('div').forEach(d => d.onmousedown = function (e) { e.preventDefault(); pickAt(d); });
+  dd.style.display = 'block';
+}
+function pickAt(el) {
+  if (!el) return;
+  const input = document.getElementById('chatInput');
+  input.value = input.value.replace(/@[A-Za-z0-9_一-龥]*$/, '@' + el.dataset.name + ' ');
+  document.getElementById('atDropdown').style.display = 'none';
+  input.focus();
 }
 function sendChat() {
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
   if (!text) return;
   input.value = '';
+  document.getElementById('atDropdown').style.display = 'none';
   showChat(myUserId, text, 'me');
   sendMsg(7, { t: 'chat', text });
   pushConv(myUserId, text);
@@ -111,15 +151,12 @@ function sendChat() {
 async function askSushi(question) {
   showChat('苏轼', '（思索中）', 'sushi');
   try {
-    // ★ 把最近 30 条讨论记录作为上下文一起发给后端，苏轼能感知全场
     const d = await apiCall('sushi_chat', { question, context: CONV.join('\n') });
     showChat('苏轼', d.answer, 'sushi');
     pushConv('苏轼', d.answer);
     sendMsg(8, { t: 'sushi', text: d.answer });
     speakSushi(d.answer);
-  } catch (e) {
-    showChat('系统', '苏轼接口调用失败：' + e.message, 'sys');
-  }
+  } catch (e) { showChat('系统', '苏轼接口调用失败：' + e.message, 'sys'); }
 }
 function speakSushi(text) {
   try {
@@ -127,9 +164,8 @@ function speakSushi(text) {
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'zh-CN'; u.rate = 0.95;
     speechSynthesis.speak(u);
-  } catch (e) { console.warn('[朗读] 当前浏览器不支持语音合成'); }
+  } catch (e) {}
 }
-// ★ 渲染消息，@提及标橙
 function showChat(who, text, cls) {
   const list = document.getElementById('chatList');
   const div = document.createElement('div');
@@ -146,7 +182,7 @@ function highlightAt(s) {
   return escapeHtml(s).replace(/@([A-Za-z0-9_一-龥]+)/g, '<span class="at">@$1</span>');
 }
 
-// ---------- 实时字幕 ----------
+// ---------- 字幕 ----------
 let recognition = null, subtitleOn = false;
 function initSubtitleButton() {
   const btn = document.getElementById('btnSubtitle');
@@ -161,10 +197,9 @@ function initSubtitleButton() {
         if (e.results[i].isFinal) {
           const raw = e.results[i][0].transcript.trim();
           if (raw) {
-            const text = '【' + myUserId + '】' + raw;
-            showSubLine(text);
-            pushConv(myUserId, raw);          // ★ 自己的发言也进讨论缓存
-            sendMsg(1, { t: 'subtitle', text });
+            showSubLine('【' + myUserId + '】' + raw);
+            pushConv(myUserId, raw);
+            sendMsg(1, { t: 'subtitle', text: '【' + myUserId + '】' + raw });
           }
         }
       }
@@ -193,7 +228,177 @@ function initScreenShare() {
   });
 }
 
-// ---------- 匿名表决 ----------
+// ---------- 协同批注 ----------
+let boardCtx = null, boardTool = 'pen', drawing = false, curPts = [], lastCursorSent = 0;
+function initBoard() {
+  const modal = document.getElementById('boardModal');
+  document.getElementById('btnBoard').onclick = () => { modal.style.display = 'flex'; resizeBoard(); };
+  modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+  boardCtx = document.getElementById('boardCanvas').getContext('2d');
+  // 工具切换
+  document.querySelectorAll('.board-toolbar .tool[data-tool]').forEach(b => {
+    b.onclick = function () {
+      document.querySelectorAll('.board-toolbar .tool[data-tool]').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      boardTool = b.dataset.tool;
+    };
+  });
+  document.getElementById('btnBoardClear').onclick = function () {
+    clearBoardCanvas();
+    sendMsg(10, { t: 'bclear' });
+  };
+  document.getElementById('btnBoardSave').onclick = saveBoard;
+  document.getElementById('boardBgInput').onchange = uploadBoardBg;
+  // 画布事件
+  const cv = document.getElementById('boardCanvas');
+  cv.addEventListener('pointerdown', boardDown);
+  cv.addEventListener('pointermove', boardMove);
+  cv.addEventListener('pointerup', boardUp);
+  cv.addEventListener('pointerleave', boardUp);
+  window.addEventListener('resize', resizeBoard);
+}
+function resizeBoard() {
+  const wrap = document.getElementById('boardWrap');
+  const cv = document.getElementById('boardCanvas');
+  const img = cv.toDataURL();               // 保留已有笔迹
+  cv.width = wrap.clientWidth; cv.height = wrap.clientHeight;
+  const im = new Image();
+  im.onload = () => boardCtx.drawImage(im, 0, 0, cv.width, cv.height);
+  im.src = img;
+}
+function getPos(e) {
+  const cv = document.getElementById('boardCanvas');
+  const r = cv.getBoundingClientRect();
+  return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
+}
+function boardDown(e) {
+  const p = getPos(e);
+  if (boardTool === 'text') {
+    const text = prompt('输入文字内容：');
+    if (text && text.trim()) {
+      const msg = { t: 'btext', x: p.x, y: p.y, text: text.trim(), color: document.getElementById('penColor').value };
+      applyBoardText(msg);
+      sendMsg(10, msg);
+    }
+    return;
+  }
+  drawing = true; curPts = [[p.x, p.y]];
+  document.getElementById('boardCanvas').setPointerCapture(e.pointerId);
+}
+function boardMove(e) {
+  if (!drawing) return;
+  const p = getPos(e);
+  curPts.push([p.x, p.y]);
+  // 本地实时画一小段
+  applyDraw({ mode: boardTool === 'eraser' ? 'erase' : 'pen', color: document.getElementById('penColor').value, width: 3, pts: curPts.slice(-2) });
+  // 批量发：累计 40 个点发一次（1KB 限制内）
+  if (curPts.length >= 40) { flushStroke(); curPts = [[p.x, p.y]]; }
+  // 光标位置节流发送，用于显示修改者名字
+  const now = Date.now();
+  if (now - lastCursorSent > 120) {
+    lastCursorSent = now;
+    sendMsg(11, { t: 'cursor', x: p.x, y: p.y });
+  }
+}
+function boardUp() {
+  if (!drawing) return;
+  drawing = false;
+  flushStroke();
+}
+function flushStroke() {
+  if (curPts.length < 2) return;
+  sendMsg(10, {
+    t: 'draw', mode: boardTool === 'eraser' ? 'erase' : 'pen',
+    color: document.getElementById('penColor').value, width: 3,
+    pts: curPts.map(p => [Math.round(p[0] * 1000) / 1000, Math.round(p[1] * 1000) / 1000])
+  });
+}
+function applyDraw(msg) {
+  const cv = document.getElementById('boardCanvas');
+  const c = boardCtx;
+  c.save();
+  if (msg.mode === 'erase') { c.globalCompositeOperation = 'destination-out'; c.strokeStyle = '#000'; c.lineWidth = msg.width * 4; }
+  else { c.globalCompositeOperation = 'source-over'; c.strokeStyle = msg.color; c.lineWidth = msg.width; }
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  c.beginPath();
+  msg.pts.forEach((p, i) => { const x = p[0] * cv.width, y = p[1] * cv.height; i === 0 ? c.moveTo(x, y) : c.lineTo(x, y); });
+  c.stroke();
+  c.restore();
+}
+function applyBoardText(msg) {
+  const cv = document.getElementById('boardCanvas');
+  boardCtx.save();
+  boardCtx.fillStyle = msg.color;
+  boardCtx.font = 'bold 20px "PingFang SC", sans-serif';
+  boardCtx.fillText(msg.text, msg.x * cv.width, msg.y * cv.height);
+  boardCtx.restore();
+}
+function clearBoardCanvas() {
+  const cv = document.getElementById('boardCanvas');
+  boardCtx.save();
+  boardCtx.globalCompositeOperation = 'source-over';
+  boardCtx.clearRect(0, 0, cv.width, cv.height);
+  boardCtx.restore();
+}
+function setBoardBg(dataUrl) {
+  clearBoardCanvas();
+  const cv = document.getElementById('boardCanvas');
+  const im = new Image();
+  im.onload = () => boardCtx.drawImage(im, 0, 0, cv.width, cv.height);
+  im.src = dataUrl;
+}
+function uploadBoardBg() {
+  const f = document.getElementById('boardBgInput').files[0];
+  if (!f) return;
+  if (f.size > 700 * 1024) { alert('底图超过 700KB，请压缩后再传'); return; }
+  const r = new FileReader();
+  r.onload = () => {
+    setBoardBg(r.result);
+    sendMsg(9, { t: 'bbg', dataUrl: r.result });
+    showSubLine('【系统】' + myUserId + ' 更新了批注底图');
+  };
+  r.readAsDataURL(f);
+}
+async function saveBoard() {
+  const cv = document.getElementById('boardCanvas');
+  const dataUrl = cv.toDataURL('image/jpeg', 0.7);
+  const b64 = dataUrl.split(',')[1];
+  if (b64.length > 950000) { alert('批注图过大，请清空部分笔迹后再保存'); return; }
+  try {
+    await apiCall('meeting_file_upload', { filename: 'board_' + Date.now() + '.jpg', content_b64: b64 });
+    showSubLine('【系统】批注已保存到会议文件');
+    sendMsg(6, { t: 'file', name: '协同批注快照.jpg' });
+  } catch (e) { alert('保存失败：' + e.message); }
+}
+// ★ 显示"谁正在改"：横幅 + 光标姓名标签
+let activeTimer = null;
+function markActive(user) {
+  const st = document.getElementById('boardStatus');
+  st.innerText = user + ' 正在批注';
+  st.style.display = 'block';
+  clearTimeout(activeTimer);
+  activeTimer = setTimeout(() => st.style.display = 'none', 2500);
+}
+const tagTimers = {};
+function showCursorTag(user, x, y) {
+  const wrap = document.getElementById('boardWrap');
+  let tag = document.getElementById('tag-' + user);
+  if (!tag) {
+    tag = document.createElement('div');
+    tag.className = 'cursor-tag';
+    tag.id = 'tag-' + user;
+    wrap.appendChild(tag);
+  }
+  tag.innerText = user;
+  tag.style.left = (x * 100) + '%';
+  tag.style.top = (y * 100) + '%';
+  tag.style.display = 'block';
+  markActive(user);
+  clearTimeout(tagTimers[user]);
+  tagTimers[user] = setTimeout(() => tag.style.display = 'none', 2000);
+}
+
+// ---------- 表决 ----------
 let currentVoteId = null, votePollTimer = null, currentQ = '', currentOpts = [];
 function initVote() {
   document.getElementById('btnVote').onclick = function () {
@@ -269,7 +474,7 @@ function showVoteResult(q, opts, counts) {
     const n = counts[i] || 0, pct = total ? Math.round(n / total * 100) : 0;
     html += escapeHtml(o) + '：<b>' + n + '</b> 票（' + pct + '%）<br>';
   });
-  html += '总计 ' + total + + ' 票</div>';
+  html += '总计 ' + total + ' 票</div>';
   document.getElementById('voteMaskContent').innerHTML = html;
   document.getElementById('vote-mask').style.display = 'flex';
   setTimeout(() => { document.getElementById('vote-mask').style.display = 'none'; }, 10000);
