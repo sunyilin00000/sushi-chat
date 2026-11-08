@@ -32,6 +32,7 @@
         .msg .file-btn { display: inline-block; padding: 6px 14px; border: 1px solid var(--gold-dim);
                          color: var(--gold); cursor: pointer; font-size: 13px; }
         .msg .file-btn:hover { background: var(--gold); color: #000; }
+        .msg.pending { opacity: 0.55; }   /* ★ 乐观渲染：发送中的消息半透明显示 */
         .sys-line { text-align: center; color: var(--muted); font-size: 11px; letter-spacing: 2px; margin: 14px 0; }
         .input-zone { border-top: 1px solid var(--line); background: var(--panel); padding: 12px 20px; position: relative; }
         .input-row { display: flex; gap: 8px; max-width: 860px; margin: 0 auto; align-items: flex-end; }
@@ -85,8 +86,9 @@
         let roster = [];
         let lastId = '';
         let recorder = null, recording = false, voiceChunks = [];
+        // ★ 自己已乐观渲染的消息 id，轮询时跳过不重复显示
+        let ownRendered = [];
 
-        // ★ 退出登录：清缓存回登录页
         function handleLogout() {
             localStorage.removeItem('xh_token');
             localStorage.removeItem('xh_user');
@@ -158,10 +160,10 @@
             return escapeHtml(s).replace(/@([A-Za-z0-9_一-龥]+)/g, '<span class="at">@$1</span>');
         }
 
-        function renderMsg(m) {
+        function renderMsg(m, pending) {
             const list = document.getElementById('msgList');
             const div = document.createElement('div');
-            const cls = m.from === myName ? 'me' : (m.from === '苏轼' ? 'sushi' : '');
+            const cls = (m.from === myName ? 'me' : (m.from === '苏轼' ? 'sushi' : '')) + (pending ? ' pending' : '');
             div.className = 'msg ' + cls;
             let bodyHtml = '';
             if (m.type === 'voice' && m.file) {
@@ -193,6 +195,8 @@
                     const fresh = d.messages.filter(m => m.id > lastId);
                     if (fresh.length && !lastId) list.innerHTML = '';
                     fresh.forEach(m => {
+                        // ★ 自己乐观渲染过的消息不重复上屏
+                        if (ownRendered.indexOf(m.id) > -1) return;
                         renderMsg(m);
                         if (m.from !== myName && m.mentions &&
                             (m.mentions.indexOf('ALL') > -1 || m.mentions.indexOf(myName) > -1)) {
@@ -211,9 +215,19 @@
             }
         }
 
+        // ★ 发送：先乐观上屏（半透明），成功后转正；服务器返回的真实 id 记入 ownRendered 防轮询重复
         async function send(text, type, file, mentions) {
-            try { await apiCall('group_send', { text, type: type || 'text', file: file || null, mentions: mentions || extractMentions(text || '') }); }
-            catch (e) { sysLine('【发送失败】' + e.message); }
+            renderMsg({
+                id: 'local', from: myName, type: type || 'text', text, file,
+                mentions: mentions || [], time: new Date().toISOString()
+            }, true);
+            try {
+                const d = await apiCall('group_send', { text, type: type || 'text', file: file || null, mentions: mentions || extractMentions(text || '') });
+                if (d.id) {
+                    ownRendered.push(d.id);
+                    if (ownRendered.length > 60) ownRendered.shift();
+                }
+            } catch (e) { sysLine('【发送失败】' + e.message); }
         }
         function extractMentions(text) {
             const ms = [];
