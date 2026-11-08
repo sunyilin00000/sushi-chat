@@ -1,5 +1,5 @@
 // meeting-features.js
-// 业务功能：字幕 / 屏幕共享 / 匿名表决 / 全员禁言 / 会议文件 / 文字聊天（@补全）/ 苏轼感知发言 / 协同批注
+// 字幕 / 屏幕共享 / 匿名表决 / 全员禁言 / 单人屏蔽禁言 / 会议文件(分片上传) / 文字聊天 / 苏轼 / 协同批注 / 本地录屏
 
 const ADMIN_USERS = ['syl'];
 
@@ -11,8 +11,10 @@ function pushConv(who, text) {
   CONV.push(who + '：' + text);
   if (CONV.length > 30) CONV.shift();
 }
-
 const roster = new Set();
+
+// ★ 单人屏蔽禁言名单（管理员维护，全员本地执行屏蔽）
+const mutedSet = new Set();
 
 function apiCall(action, dataParams) {
   const body = { action, token };
@@ -38,7 +40,10 @@ window.addEventListener('meeting-ready', function () {
   myUserId = window.meeting.userId; token = window.meeting.token;
   roster.add(myUserId);
   try { isAdmin = (JSON.parse(localStorage.getItem('xh_user') || '{}').role === 'admin'); } catch (e) {}
-  if (isAdmin) ['btnVote', 'btnMuteAll', 'btnUnmute'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+  if (isAdmin) {
+    ['btnVote', 'btnMuteAll', 'btnUnmute'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+    document.querySelectorAll('.mute-btn').forEach(b => b.style.display = 'block');
+  }
 
   initCustomMessages();
   initSubtitleButton();
@@ -48,22 +53,56 @@ window.addEventListener('meeting-ready', function () {
   initFiles();
   initChat();
   initBoard();
-  // ★ 离会时自动把会议记录存档进苏轼记忆库
+  initRecord();
+  // ★ 离会：存档 + 苏轼纪要
   document.getElementById('btnLeave').onclick = async function () {
+    let summary = '';
     try {
       if (CONV.length) {
-        await apiCall('meeting_record_save', {
+        showSubLine('【系统】会议存档中，苏轼正在生成纪要…');
+        const d = await apiCall('meeting_record_save', {
           room: String(window.meeting.roomId),
           name: document.getElementById('meetingName').innerText || '',
           lines: CONV.slice(-200)
         });
+        summary = d.summary || '';
       }
     } catch (e) { console.warn('会议存档失败:', e); }
+    if (summary) alert('【苏轼 · 会议纪要】\n\n' + summary);
     window.meeting.leave();
   };
-  trtc.on(TRTC.EVENT.REMOTE_USER_ENTER, e => roster.add(e.userId));
+  // 名单维护 + 管理员向新加入者同步禁言名单
+  trtc.on(TRTC.EVENT.REMOTE_USER_ENTER, function (e) {
+    roster.add(e.userId);
+    if (isAdmin && mutedSet.size) sendMsg(4, { t: 'mute_list', list: [...mutedSet] });
+  });
   trtc.on(TRTC.EVENT.REMOTE_USER_LEAVE, e => roster.delete(e.userId));
+  // ★ 管理员点击格子上禁言按钮（事件委托，含后加入者）
+  document.getElementById('remote-videos').addEventListener('click', function (e) {
+    const btn = e.target.closest('.mute-btn');
+    if (!btn || !isAdmin) return;
+    const uid = btn.dataset.uid;
+    const muted = !mutedSet.has(uid);
+    mutedSet[muted ? 'add' : 'delete'](uid);
+    sendMsg(4, { t: 'mute_target', target: uid, muted: muted, list: [...mutedSet] });
+    applyLocalMute(uid, muted);
+  });
 });
+
+// ★ 本地执行屏蔽/恢复某人的声音
+function applyLocalMute(uid, muted) {
+  if (uid !== myUserId) {
+    try { trtc.muteRemoteAudio(uid, muted); } catch (e) {}
+  }
+  const btn = document.querySelector('.mute-btn[data-uid="' + uid + '"]');
+  if (btn) {
+    btn.innerText = muted ? '已禁言' : '禁言';
+    btn.classList.toggle('muted', muted);
+  }
+  if (uid === myUserId) {
+    showSubLine(muted ? '【系统】管理员已屏蔽你的发言，其他人听不到你' : '【系统】管理员已恢复你的发言');
+  }
+}
 
 function initCustomMessages() {
   trtc.on(TRTC.EVENT.CUSTOM_MESSAGE, function (event) {
@@ -79,8 +118,26 @@ function initCustomMessages() {
     else if (msg.t === 'mute_all') {
       if (ADMIN_USERS.includes(from)) { window.meeting.muteLocalAudio(); showSubLine('【系统】管理员已开启全员禁言'); }
     } else if (msg.t === 'unmute_all') {
-      if (ADMIN_USERS.includes(from)) { window.meeting.muteLocalAudio(); showSubLine('【系统】管理员已解除全员禁言'); }
-    } else if (msg.t === 'file') {
+      if (ADMIN_USERS.includes(from)) { window.meeting.unmuteLocalAudio(); showSubLine('【系统】管理员已解除全员禁言'); }
+    }
+    // ★ 单人禁言信令
+    else if (msg.t === 'mute_target' && ADMIN_USERS.includes(from)) {
+      if (Array.isArray(msg.list)) {
+        const next = new Set(msg.list);
+        mutedSet.forEach(u => { if (!next.has(u)) applyLocalMute(u, false); });   // 名单里被移除的恢复
+        next.forEach(u => { if (!mutedSet.has(u)) applyLocalMute(u, true); });
+        mutedSet.clear(); next.forEach(u => mutedSet.add(u));
+      }
+      if (msg.target) applyLocalMute(msg.target, msg.muted);
+    } else if (msg.t === 'mute_list' && ADMIN_USERS.includes(from)) {
+      if (Array.isArray(msg.list)) {
+        const next = new Set(msg.list);
+        mutedSet.forEach(u => { if (!next.has(u)) applyLocalMute(u, false); });
+        next.forEach(u => { if (!mutedSet.has(u)) applyLocalMute(u, true); });
+        mutedSet.clear(); next.forEach(u => mutedSet.add(u));
+      }
+    }
+    else if (msg.t === 'file') {
       showSubLine('【系统】' + from + ' 上传了会议文件：' + msg.name);
       refreshFileList();
     } else if (msg.t === 'chat') {
@@ -96,6 +153,85 @@ function initCustomMessages() {
   });
 }
 function stripName(t) { return t.replace(/^【.+?】/, ''); }
+
+// ---------- ★ 分片上传（突破 700KB：每片 600KB 单独走接口，下载时自动拼接） ----------
+const CHUNK_SIZE = 600 * 1024;
+function blobToB64(blob) {
+  return new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.readAsDataURL(blob); });
+}
+async function uploadBigFile(file) {
+  const n = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
+  const upid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const safeBase = file.name.replace(/[^\w.\-一-龥]/g, '_').slice(0, 40);
+  for (let i = 0; i < n; i++) {
+    const b64 = await blobToB64(file.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE));
+    await apiCall('meeting_file_upload', { filename: `${i}of${n}__${upid}__${safeBase}`, content_b64: b64 });
+  }
+  return { name: safeBase, path: null, upid: upid, parts: n };   // path 由下载方按 upid 查
+}
+function parsePartName(name) {
+  const m = String(name).match(/^(\d+)of(\d+)__(\w+)__/);
+  return m ? { i: Number(m[1]), n: Number(m[2]), upid: m[3], base: name.replace(/^\d+of\d+__\w+__/, '') } : null;
+}
+// 下载：单片直下；分片自动找齐拼合（上限 30MB）
+async function downloadAny(filePayload) {
+  if (!filePayload.upid) return downloadSingle(filePayload.path, filePayload.name);
+  const d = await apiCall('meeting_file_list');
+  const parts = (d.files || []).map(f => ({ f, p: parsePartName(f.name) }))
+    .filter(x => x.p && x.p.upid === filePayload.upid)
+    .sort((a, b) => a.p.i - b.p.i);
+  if (!parts.length) throw new Error('找不到文件分片');
+  const blobs = [];
+  for (const x of parts) {
+    const dd = await apiCall('meeting_file_download', { path: x.f.path });
+    const bin = atob(dd.content_b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    blobs.push(arr);
+  }
+  const total = blobs.reduce((a, b) => a + b.length, 0);
+  const all = new Uint8Array(total);
+  let off = 0;
+  blobs.forEach(b => { all.set(b, off); off += b.length; });
+  triggerDownload(new Blob([all]), filePayload.name);
+}
+function triggerDownload(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name; a.click();
+}
+async function downloadSingle(path, name) {
+  const d = await apiCall('meeting_file_download', { path });
+  const bin = atob(d.content_b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  triggerDownload(new Blob([arr]), name);
+}
+
+// ---------- 本地录屏 ----------
+let mediaRecorder = null, recChunks = [];
+function initRecord() {
+  const btn = document.getElementById('btnRecord');
+  btn.onclick = async function () {
+    if (mediaRecorder && mediaRecorder.state === 'recording') { mediaRecorder.stop(); return; }
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      recChunks = [];
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = e => { if (e.data.size) recChunks.push(e.data); };
+      mediaRecorder.onstop = function () {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(recChunks, { type: 'video/webm' });
+        triggerDownload(blob, 'meeting_record_' + Date.now() + '.webm');
+        btn.innerText = '录制'; btn.classList.remove('recording');
+        showSubLine('【系统】录屏已保存到本地');
+      };
+      mediaRecorder.start();
+      btn.innerText = '停止录制'; btn.classList.add('recording');
+      showSubLine('【系统】录屏中（共享整个屏幕以获得完整会议画面）');
+    } catch (e) { showSubLine('【系统】录屏已取消'); }
+  };
+}
 
 // ---------- 聊天 + @补全 ----------
 function initChat() {
@@ -213,7 +349,7 @@ function initSubtitleButton() {
   };
 }
 
-// ---------- 屏幕共享 ----------
+// ---------- 屏幕共享（5fps 1080p，共享文档足够且省带宽） ----------
 let sharing = false;
 function initScreenShare() {
   const btn = document.getElementById('btnShare');
@@ -221,7 +357,10 @@ function initScreenShare() {
   btn.onclick = async function () {
     if (!sharing) {
       try {
-        await trtc.startScreenShare({ view: 'screen-share-view' });
+        await trtc.startScreenShare({
+          view: 'screen-share-view',
+          option: { profile: '1080p', qosPreference: TRTC.TYPE.QOS_PREFERENCE_SMOOTH }
+        });
         sharing = true; big.dataset.sharer = myUserId; btn.innerText = '停止共享';
       } catch (e) { console.warn('[共享] 已取消或不支持:', e); }
     } else { await trtc.stopScreenShare(); }
@@ -229,6 +368,61 @@ function initScreenShare() {
   trtc.on(TRTC.EVENT.SCREEN_SHARE_STOPPED, function () {
     sharing = false; big.style.display = 'none'; delete big.dataset.sharer; btn.innerText = '屏幕共享';
   });
+}
+
+// ---------- 全员禁言 ----------
+function initMuteButtons() {
+  document.getElementById('btnMuteAll').onclick = function () {
+    sendMsg(4, { t: 'mute_all' });
+    window.meeting.muteRemoteAudio();
+    showSubLine('【系统】你已开启全员禁言');
+  };
+  document.getElementById('btnUnmute').onclick = function () {
+    sendMsg(5, { t: 'unmute_all' });
+    window.meeting.unmuteRemoteAudio();
+    showSubLine('【系统】你已解除全员禁言');
+  };
+}
+
+// ---------- 会议文件（分片上传，单文件可达 30MB） ----------
+function initFiles() {
+  document.getElementById('btnFiles').onclick = function () {
+    document.getElementById('fileModal').style.display = 'flex';
+    refreshFileList();
+  };
+  document.getElementById('btnUploadFile').onclick = async function () {
+    const f = document.getElementById('fileInput').files[0];
+    if (!f) { alert('请先选择文件'); return; }
+    if (f.size > 30 * 1024 * 1024) { alert('文件超过 30MB，请压缩后上传'); return; }
+    try {
+      if (f.size > CHUNK_SIZE) {
+        const r = await uploadBigFile(f);
+        showSubLine('【系统】文件上传成功（分片）：' + f.name);
+        sendMsg(6, { t: 'file', name: f.name });
+      } else {
+        const b64 = await blobToB64(f);
+        const up = await apiCall('meeting_file_upload', { filename: f.name, content_b64: b64 });
+        showSubLine('【系统】文件上传成功：' + f.name);
+        sendMsg(6, { t: 'file', name: f.name });
+      }
+      refreshFileList();
+    } catch (e) { alert('上传失败：' + e.message); }
+  };
+  document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.style.display = 'none'; }));
+}
+async function refreshFileList() {
+  const box = document.getElementById('fileList');
+  try {
+    const d = await apiCall('meeting_file_list');
+    const visible = (d.files || []).filter(f => { const p = parsePartName(f.name); return !p || p.i === 0; });
+    if (!visible.length) { box.innerHTML = '<p style="color:var(--muted);font-size:13px;">暂无文件</p>'; return; }
+    box.innerHTML = visible.map(f => {
+      const p = parsePartName(f.name);
+      const disp = p ? p.base : f.name;
+      const payload = p ? { name: p.base, path: f.path, upid: p.upid, parts: p.n } : { name: f.name, path: f.path };
+      return `<div class="file-item"><span>${escapeHtml(disp)}${p ? '（分片）' : ''}</span><button onclick='downloadAny(${JSON.stringify(payload)})'>下载</button></div>`;
+    }).join('');
+  } catch (e) { box.innerHTML = '<p style="color:#d98a6a;font-size:13px;">加载失败：' + e.message + '</p>'; }
 }
 
 // ---------- 协同批注 ----------
@@ -348,7 +542,7 @@ function setBoardBg(dataUrl) {
 function uploadBoardBg() {
   const f = document.getElementById('boardBgInput').files[0];
   if (!f) return;
-  if (f.size > 700 * 1024) { alert('底图超过 700KB，请压缩后再传'); return; }
+  if (f.size > 2 * 1024 * 1024) { alert('底图请控制在 2MB 以内'); return; }
   const r = new FileReader();
   r.onload = () => {
     setBoardBg(r.result);
@@ -475,59 +669,4 @@ function showVoteResult(q, opts, counts) {
   document.getElementById('voteMaskContent').innerHTML = html;
   document.getElementById('vote-mask').style.display = 'flex';
   setTimeout(() => { document.getElementById('vote-mask').style.display = 'none'; }, 10000);
-}
-
-// ---------- 全员禁言 ----------
-function initMuteButtons() {
-  document.getElementById('btnMuteAll').onclick = function () {
-    sendMsg(4, { t: 'mute_all' });
-    window.meeting.muteRemoteAudio();
-    showSubLine('【系统】你已开启全员禁言');
-  };
-  document.getElementById('btnUnmute').onclick = function () {
-    sendMsg(5, { t: 'unmute_all' });
-    window.meeting.unmuteRemoteAudio();
-    showSubLine('【系统】你已解除全员禁言');
-  };
-}
-
-// ---------- 会议文件 ----------
-function initFiles() {
-  document.getElementById('btnFiles').onclick = function () {
-    document.getElementById('fileModal').style.display = 'flex';
-    refreshFileList();
-  };
-  document.getElementById('btnUploadFile').onclick = async function () {
-    const f = document.getElementById('fileInput').files[0];
-    if (!f) { alert('请先选择文件'); return; }
-    if (f.size > 700 * 1024) { alert('文件超过 700KB，请压缩后上传'); return; }
-    const b64 = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.readAsDataURL(f); });
-    try {
-      await apiCall('meeting_file_upload', { filename: f.name, content_b64: b64 });
-      showSubLine('【系统】文件上传成功：' + f.name);
-      sendMsg(6, { t: 'file', name: f.name });
-      refreshFileList();
-    } catch (e) { alert('上传失败：' + e.message); }
-  };
-  document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.style.display = 'none'; }));
-}
-async function refreshFileList() {
-  const box = document.getElementById('fileList');
-  try {
-    const d = await apiCall('meeting_file_list');
-    if (!d.files || !d.files.length) { box.innerHTML = '<p style="color:var(--muted);font-size:13px;">暂无文件</p>'; return; }
-    box.innerHTML = d.files.map(f =>
-      `<div class="file-item"><span>${escapeHtml(f.name)}（${Math.round(f.size / 1024)}KB）</span><button onclick="downloadFile('${f.path}', '${escapeHtml(f.name)}')">下载</button></div>`).join('');
-  } catch (e) { box.innerHTML = '<p style="color:#d98a6a;font-size:13px;">加载失败：' + e.message + '</p>'; }
-}
-async function downloadFile(path, name) {
-  try {
-    const d = await apiCall('meeting_file_download', { path });
-    const bin = atob(d.content_b64);
-    const arr = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([arr]));
-    a.download = name; a.click();
-  } catch (e) { alert('下载失败：' + e.message); }
 }
