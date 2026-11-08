@@ -27,20 +27,22 @@
         .ctrl-buttons button.alert { border-color: #8a3a2a; color: #d98a6a; }
         .ctrl-buttons button.alert:hover { background: #8a3a2a; color: #fff; }
         .ctrl-buttons button.recording { background: #8a3a2a; border-color: #8a3a2a; color: #fff; }
+        .ctrl-buttons button.active { background: var(--gold); color: #000; }
         .main-row { flex: 1; display: flex; min-height: 0; }
         #stage { flex: 1; position: relative; display: flex; flex-direction: column; min-width: 0; }
         #bigscreen { height: 52%; min-height: 220px; background: #000; display: none; border-bottom: 1px solid var(--gold-dim); }
         #screen-share-view { width: 100%; height: 100%; }
         #remote-videos { flex: 1; display: flex; flex-wrap: wrap; gap: 12px; padding: 16px;
                          align-content: flex-start; justify-content: center; overflow-y: auto; }
-        /* ★ 成员格子：可点击切大流，右上角禁言按钮 */
         .remote-cell { width: 300px; height: 225px; background: #000; border: 1px solid var(--line);
-                       cursor: pointer; position: relative; }
+                       cursor: pointer; position: relative; overflow: hidden; }
         .mute-btn { position: absolute; top: 6px; right: 6px; z-index: 10; padding: 3px 10px; font-size: 11px;
                     letter-spacing: 1px; background: rgba(0,0,0,0.7); border: 1px solid var(--gold-dim);
                     color: var(--gold); cursor: pointer; font-family: inherit; }
         .mute-btn:hover { background: var(--gold); color: #000; }
         .mute-btn.muted { background: #8a3a2a; border-color: #8a3a2a; color: #fff; }
+        /* ★ 专注度检测画布：叠在视频上，不挡鼠标 */
+        .face-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; }
         #vote-mask { display: none; position: absolute; inset: 0; background: rgba(4,4,6,0.93); z-index: 50;
                      align-items: center; justify-content: center; text-align: center; padding: 40px; }
         .mask-frame { max-width: 640px; border: 1px solid var(--gold-dim); padding: 40px 50px; background: var(--panel); }
@@ -52,7 +54,7 @@
                     padding: 7px 16px; margin-top: 6px; font-size: 16px; letter-spacing: 1px; animation: subfade 8s forwards; }
         @keyframes subfade { 0% {opacity:0;} 8% {opacity:1;} 80% {opacity:1;} 100% {opacity:0;} }
         .local-box { position: fixed; left: 18px; bottom: 18px; width: 200px; height: 150px; background: #000;
-                     border: 1px solid var(--gold-dim); z-index: 60; }
+                     border: 1px solid var(--gold-dim); z-index: 60; overflow: hidden; }
         #chatPanel { width: 320px; border-left: 1px solid var(--gold-dim); background: var(--panel);
                      display: flex; flex-direction: column; flex-shrink: 0; position: relative; }
         #chatPanel.collapsed { width: 0; border: none; overflow: hidden; }
@@ -125,6 +127,7 @@
             <span class="room-label">ROOM <b id="roomLabel">-</b></span>
         </div>
         <div class="ctrl-buttons">
+            <button id="btnAttention">专注度</button>
             <button id="btnSubtitle">实时字幕</button>
             <button id="btnShare">屏幕共享</button>
             <button id="btnBoard">协同批注</button>
@@ -216,6 +219,8 @@
         </div>
     </div>
 
+    <!-- ★ 人脸检测库（本地文件，模型在 ./models/） -->
+    <script src="face-api.js"></script>
     <script>
         document.getElementById('roomLabel').innerText =
             new URLSearchParams(location.search).get('room') || '101';
