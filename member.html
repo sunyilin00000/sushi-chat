@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>星环终端 - 团队工作台</title>
-    <!-- ★ Chart.js 本地化：原 jsDelivr 地址在用户网络被屏蔽，会卡住整个页面 -->
     <script src="chart.js"></script>
     <style>
         :root {
@@ -68,6 +67,7 @@
         .btn-edit { background: #f59e0b; }
         .btn-del { background: var(--danger); }
         .btn-map { background: #3b82f6; }
+        .btn-task { background: #0ea5e9; }
         .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
         .modal-content { background: white; border-radius: 12px; width: 90%; max-width: 600px; max-height: 85vh; display: flex; flex-direction: column; }
         .modal-header { padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
@@ -86,6 +86,12 @@
         .report-box p { font-size: 14px; line-height: 1.6; color: var(--text); margin-bottom: 10px; }
         .report-box.advice h4 { border-left-color: #f59e0b; }
         .report-box.warning h4 { border-left-color: var(--danger); color: var(--danger); }
+        /* ★ 任务编辑表单 */
+        .edit-form { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 15px; margin-bottom: 15px; }
+        .edit-form .form-group { margin-bottom: 10px; }
+        .edit-form .form-group input, .edit-form .form-group select, .edit-form .form-group textarea { padding: 8px; font-size: 14px; }
+        .edit-actions { display: flex; gap: 8px; margin-top: 8px; }
+        .edit-actions button { flex: 1; padding: 9px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; color: white; font-size: 13px; }
         .hidden { display: none !important; }
         .error-msg { color: #ef4444; font-size: 14px; margin-top: 10px; text-align: center; word-break: break-all; }
     </style>
@@ -288,14 +294,13 @@
             finally { btn.innerText = "注册并登录"; btn.disabled = false; }
         }
 
-        // ★ 退出登录：清缓存并强制回到登录页
         function handleLogout() {
             localStorage.removeItem('xh_token');
             localStorage.removeItem('xh_user');
             currentToken = null;
             currentUser = null;
             if (psychChartInstance) { psychChartInstance.destroy(); psychChartInstance = null; }
-            location.reload();   // 刷新后自然停在登录界面，状态最干净
+            location.reload();
         }
 
         function showMainView() {
@@ -405,15 +410,86 @@
                             <p style="font-size: 11px; color: #94a3b8; margin-top: 2px;">最后登录: ${m.last_login_time && m.last_login_time !== "从未登录" ? new Date(m.last_login_time).toLocaleString() : "从未登录"}</p>
                         </div>
                         <div class="member-actions" style="align-items: flex-start;">
+                            <button class="btn-small btn-task" onclick="viewMemberTasks('${m.username}', '${m.name}')">任务</button>
                             <button class="btn-small btn-chat" onclick="viewChat('${m.username}', '${m.name}')">对话</button>
                             <button class="btn-small btn-psych" onclick="viewPsych('${m.username}', '${m.name}')">分析图</button>
-                            <button class="btn-small btn-map" onclick="viewLocation('${m.username}', '${m.name}')">定位</button>
                             <button class="btn-small btn-edit" onclick="renameMember('${m.username}', '${m.name}')">改名</button>
                             <button class="btn-small btn-del" onclick="deleteMember('${m.username}', '${m.name}')">删除</button>
                         </div>
                     </div>
                 `).join('');
             } catch (err) { select.innerHTML = '<option value="">加载失败</option>'; list.innerHTML = `<p class="error-msg">加载失败: ${err.message}</p>`; }
+        }
+
+        // ★ 管理员查看并管理某成员的任务
+        async function viewMemberTasks(username, name) {
+            if (psychChartInstance) { psychChartInstance.destroy(); psychChartInstance = null; }
+            document.getElementById('modalTitle').innerText = name + ' 的任务（可编辑/删除）';
+            document.getElementById('modalBody').innerHTML = '<p style="text-align:center;">加载中...</p>';
+            document.getElementById('detailModal').classList.remove('hidden');
+            let tasks;
+            try {
+                const d = await apiCall('admin_tasks', { owner: username });
+                tasks = d.tasks || [];
+            } catch (err) {
+                document.getElementById('modalBody').innerHTML = `<p style="color:red; text-align:center;">加载失败: ${err.message}</p>`;
+                return;
+            }
+            if (!tasks.length) {
+                document.getElementById('modalBody').innerHTML = '<p style="text-align:center; color:#64748b;">该成员暂无任务</p>';
+                return;
+            }
+            document.getElementById('modalBody').innerHTML = tasks.map(t => {
+                const dl = t.deadline ? new Date(t.deadline).toISOString().slice(0, 16) : '';
+                return `
+                <div class="edit-form" id="form_${t.id}">
+                    <div class="form-group"><label>标题</label><input type="text" id="title_${t.id}" value="${t.title}"></div>
+                    <div class="form-group"><label>说明</label><textarea id="desc_${t.id}" rows="2">${t.description || ''}</textarea></div>
+                    <div class="form-group"><label>截止时间</label><input type="datetime-local" id="dl_${t.id}" value="${dl}"></div>
+                    <div class="form-group"><label>优先级</label>
+                        <select id="pri_${t.id}">
+                            <option value="P0" ${t.priority==='P0'?'selected':''}>P0（最高）</option>
+                            <option value="P1" ${t.priority==='P1'?'selected':''}>P1（普通）</option>
+                            <option value="P2" ${t.priority==='P2'?'selected':''}>P2（较低）</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>状态</label>
+                        <select id="st_${t.id}">
+                            <option value="pending" ${t.status==='pending'?'selected':''}>待处理</option>
+                            <option value="submitted" ${t.status==='submitted'?'selected':''}>已提交</option>
+                            <option value="approved" ${t.status==='approved'?'selected':''}>已通过</option>
+                        </select>
+                    </div>
+                    <div class="edit-actions">
+                        <button style="background:#3b82f6;" onclick="saveTaskEdit('${t.id}', '${username}', '${name}')">保存修改</button>
+                        <button style="background:#ef4444;" onclick="deleteTask('${t.id}', '${username}', '${name}')">删除任务</button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        async function saveTaskEdit(taskId, username, name) {
+            try {
+                await apiCall('update_task', {
+                    task_id: taskId,
+                    title: document.getElementById('title_' + taskId).value.trim(),
+                    description: document.getElementById('desc_' + taskId).value.trim(),
+                    deadline: new Date(document.getElementById('dl_' + taskId).value).toISOString(),
+                    priority: document.getElementById('pri_' + taskId).value,
+                    status: document.getElementById('st_' + taskId).value
+                });
+                alert("已保存");
+                viewMemberTasks(username, name);
+            } catch (err) { alert("保存失败: " + err.message); }
+        }
+
+        async function deleteTask(taskId, username, name) {
+            if (!confirm("确定删除该任务？相关提交记录也会一并删除，不可恢复。")) return;
+            try {
+                await apiCall('delete_task', { task_id: taskId });
+                alert("已删除");
+                viewMemberTasks(username, name);
+            } catch (err) { alert("删除失败: " + err.message); }
         }
 
         async function renameMember(username, oldName) {
