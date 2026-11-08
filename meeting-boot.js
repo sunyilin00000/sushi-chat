@@ -8,7 +8,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     // ============ 第 0 步：检查是否已登录（member.html 登录后存 xh_token） ============
     const token = localStorage.getItem('xh_token');
     if (!token) {
-      // 没登录就直接回工作台登录
       location.href = 'member.html';
       return;
     }
@@ -37,12 +36,19 @@ document.addEventListener('DOMContentLoaded', async function () {
     // ============ 第 4 步：创建 TRTC 实例、注册远端用户事件 ============
     const trtc = TRTC.create();
 
-    // 远端用户进房
+    // ★ 修改点1：远端用户进房时，自动在远端画面墙里给它建一个 <div id="video-用户ID">
     trtc.on(TRTC.EVENT.REMOTE_USER_ENTER, function (event) {
       console.log('[会议] 远端用户进房:', event.userId);
+      const wall = document.getElementById('remote-videos');
+      if (wall && !document.getElementById('video-' + event.userId)) {
+        const cell = document.createElement('div');
+        cell.className = 'remote-cell';
+        cell.id = 'video-' + event.userId;   // SDK 会把画面渲染进这个 div
+        wall.appendChild(cell);
+      }
     });
 
-    // 远端用户发布音视频：订阅并播放（页面里需要有 <div id="video-远端用户ID"></div>）
+    // 远端用户发布音视频：订阅并播放（画面容器已在上一个事件里创建好）
     trtc.on(TRTC.EVENT.REMOTE_VIDEO_AVAILABLE, function (event) {
       trtc.startRemoteVideo({
         userId: event.userId,
@@ -51,9 +57,11 @@ document.addEventListener('DOMContentLoaded', async function () {
       });
     });
 
-    // 远端用户退房
+    // ★ 修改点2：远端用户退房时，把它的画面格子删掉
     trtc.on(TRTC.EVENT.REMOTE_USER_LEAVE, function (event) {
       console.log('[会议] 远端用户退房:', event.userId);
+      const cell = document.getElementById('video-' + event.userId);
+      if (cell) cell.remove();
     });
 
     // ============ 第 5 步：进房（房间号从网址读，如 meeting.html?room=101） ============
@@ -67,7 +75,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     // ============ 第 6 步：强制申请摄像头/麦克风（你的需求：强制授权） ============
     try {
-      await trtc.startLocalVideo({ view: 'local-video' }); // 页面需有 <div id="local-video">
+      await trtc.startLocalVideo({ view: 'local-video' }); // 页面里有 <div id="local-video">
       await trtc.startLocalAudio();
     } catch (e) {
       alert('摄像头/麦克风授权被拒绝，无法加入会议，请刷新页面并重试');
@@ -75,12 +83,12 @@ document.addEventListener('DOMContentLoaded', async function () {
       return;
     }
 
-    // ============ 第 7 步：暴露控制接口给后续业务代码（投票/字幕/禁言会用） ============
+    // ============ 第 7 步：暴露控制接口给页面按钮和业务代码（投票/字幕/禁言会用） ============
     window.meeting = {
       trtc: trtc,
       userId: sigData.userId,
       roomId: Number(roomId),
-      muteAllRemoteAudio: function () { trtc.muteAllRemoteAudio(); },     // 管理员一键全体禁言（本端静音所有远端）
+      muteAllRemoteAudio: function () { trtc.muteAllRemoteAudio(); },     // 本端静音所有远端声音
       unmuteAllRemoteAudio: function () { trtc.unmuteAllRemoteAudio(); }, // 解除
       stopLocalAudio: function () { trtc.stopLocalAudio(); },             // 被禁言的客户端执行
       startLocalAudio: function () { trtc.startLocalAudio(); },
