@@ -1,5 +1,5 @@
 // meeting-features.js
-// 字幕 / 屏幕共享 / 匿名表决 / 全员禁言 / 单人屏蔽禁言 / 会议文件(分片上传) / 文字聊天 / 苏轼 / 协同批注 / 本地录屏
+// 字幕 / 屏幕共享 / 匿名表决 / 全员禁言 / 单人屏蔽禁言 / 会议文件(分片) / 聊天 / 苏轼 / 协同批注 / 录屏 / ★专注度检测
 
 const ADMIN_USERS = ['syl'];
 
@@ -12,8 +12,10 @@ function pushConv(who, text) {
   if (CONV.length > 30) CONV.shift();
 }
 const roster = new Set();
+// ★ 用户名 → 显示名 映射（会议中展示用）
+const nameMap = {};
+function displayName(uid) { return nameMap[uid] || uid; }
 
-// ★ 单人屏蔽禁言名单（管理员维护，全员本地执行屏蔽）
 const mutedSet = new Set();
 
 function apiCall(action, dataParams) {
@@ -44,6 +46,10 @@ window.addEventListener('meeting-ready', function () {
     ['btnVote', 'btnMuteAll', 'btnUnmute'].forEach(id => document.getElementById(id).classList.remove('hidden'));
     document.querySelectorAll('.mute-btn').forEach(b => b.style.display = 'block');
   }
+  // ★ 拉内部花名册，建立 用户名→显示名 映射
+  apiCall('internal_roster').then(d => {
+    (d.members || []).forEach(m => { nameMap[m.username] = m.name; roster.add(m.username); });
+  }).catch(() => {});
 
   initCustomMessages();
   initSubtitleButton();
@@ -54,7 +60,7 @@ window.addEventListener('meeting-ready', function () {
   initChat();
   initBoard();
   initRecord();
-  // ★ 离会：存档 + 苏轼纪要
+  initAttention();
   document.getElementById('btnLeave').onclick = async function () {
     let summary = '';
     try {
@@ -71,13 +77,11 @@ window.addEventListener('meeting-ready', function () {
     if (summary) alert('【苏轼 · 会议纪要】\n\n' + summary);
     window.meeting.leave();
   };
-  // 名单维护 + 管理员向新加入者同步禁言名单
   trtc.on(TRTC.EVENT.REMOTE_USER_ENTER, function (e) {
     roster.add(e.userId);
     if (isAdmin && mutedSet.size) sendMsg(4, { t: 'mute_list', list: [...mutedSet] });
   });
   trtc.on(TRTC.EVENT.REMOTE_USER_LEAVE, e => roster.delete(e.userId));
-  // ★ 管理员点击格子上禁言按钮（事件委托，含后加入者）
   document.getElementById('remote-videos').addEventListener('click', function (e) {
     const btn = e.target.closest('.mute-btn');
     if (!btn || !isAdmin) return;
@@ -89,7 +93,6 @@ window.addEventListener('meeting-ready', function () {
   });
 });
 
-// ★ 本地执行屏蔽/恢复某人的声音
 function applyLocalMute(uid, muted) {
   if (uid !== myUserId) {
     try { trtc.muteRemoteAudio(uid, muted); } catch (e) {}
@@ -120,11 +123,10 @@ function initCustomMessages() {
     } else if (msg.t === 'unmute_all') {
       if (ADMIN_USERS.includes(from)) { window.meeting.unmuteLocalAudio(); showSubLine('【系统】管理员已解除全员禁言'); }
     }
-    // ★ 单人禁言信令
     else if (msg.t === 'mute_target' && ADMIN_USERS.includes(from)) {
       if (Array.isArray(msg.list)) {
         const next = new Set(msg.list);
-        mutedSet.forEach(u => { if (!next.has(u)) applyLocalMute(u, false); });   // 名单里被移除的恢复
+        mutedSet.forEach(u => { if (!next.has(u)) applyLocalMute(u, false); });
         next.forEach(u => { if (!mutedSet.has(u)) applyLocalMute(u, true); });
         mutedSet.clear(); next.forEach(u => mutedSet.add(u));
       }
@@ -138,10 +140,10 @@ function initCustomMessages() {
       }
     }
     else if (msg.t === 'file') {
-      showSubLine('【系统】' + from + ' 上传了会议文件：' + msg.name);
+      showSubLine('【系统】' + displayName(from) + ' 上传了会议文件：' + msg.name);
       refreshFileList();
     } else if (msg.t === 'chat') {
-      if (from !== myUserId) { showChat(from, msg.text, 'other'); pushConv(from, msg.text); }
+      if (from !== myUserId) { showChat(displayName(from), msg.text, 'other'); pushConv(from, msg.text); }
     } else if (msg.t === 'sushi') {
       if (from !== myUserId) { showChat('苏轼', msg.text, 'sushi'); pushConv('苏轼', msg.text); speakSushi(msg.text); }
     }
@@ -149,12 +151,141 @@ function initCustomMessages() {
     else if (msg.t === 'btext') { if (from !== myUserId) { applyBoardText(msg); markActive(from); } }
     else if (msg.t === 'bclear') { if (from !== myUserId && ADMIN_USERS.includes(from)) clearBoardCanvas(); }
     else if (msg.t === 'bbg') { if (from !== myUserId) setBoardBg(msg.dataUrl); }
-    else if (msg.t === 'cursor') { if (from !== myUserId) showCursorTag(from, msg.x, msg.y); }
+    else if (msg.t === 'cursor') { if (from !== myUserId) showCursorTag(displayName(from), msg.x, msg.y); }
   });
 }
 function stripName(t) { return t.replace(/^【.+?】/, ''); }
 
-// ---------- ★ 分片上传（突破 700KB：每片 600KB 单独走接口，下载时自动拼接） ----------
+// ---------- ★ 专注度检测（人脸方框 + 状态注释，纯本地运行） ----------
+let faceOn = false, faceModelsReady = false, faceTimer = null;
+const faceState = {};   // uid -> { miss: 连续未检测到次数, status: 当前状态 }
+
+function initAttention() {
+  const btn = document.getElementById('btnAttention');
+  btn.onclick = async function () {
+    if (faceOn) {
+      // 关闭
+      faceOn = false;
+      clearInterval(faceTimer);
+      btn.innerText = '专注度';
+      btn.classList.remove('active');
+      document.querySelectorAll('.face-canvas').forEach(c => c.remove());
+      return;
+    }
+    if (!window.faceapi) { alert('face-api.js 未加载，请检查文件是否存在'); return; }
+    btn.innerText = '模型加载中…';
+    try {
+      await faceapi.nets.tinyFaceDetector.loadFromUri('./models');
+      faceModelsReady = true;
+    } catch (e) {
+      alert('模型加载失败：' + e.message + '\n请检查 models 文件夹里两个模型文件是否齐全');
+      btn.innerText = '专注度';
+      return;
+    }
+    faceOn = true;
+    btn.innerText = '专注度：开';
+    btn.classList.add('active');
+    faceTimer = setInterval(detectAllFaces, 2500);
+    detectAllFaces();
+  };
+}
+
+// 确保容器上有画布
+function ensureCanvas(container) {
+  let cv = container.querySelector('.face-canvas');
+  if (!cv) {
+    cv = document.createElement('canvas');
+    cv.className = 'face-canvas';
+    container.appendChild(cv);
+  }
+  return cv;
+}
+
+async function detectAllFaces() {
+  if (!faceModelsReady) return;
+  // 检测对象：自己始终检测；远端成员仅管理员检测
+  const jobs = [['self', document.getElementById('local-video')]];
+  if (isAdmin) {
+    document.querySelectorAll('.remote-cell').forEach(cell => {
+      jobs.push([cell.id.replace('cell-', ''), cell]);
+    });
+  }
+  for (const [uid, container] of jobs) {
+    const video = container.querySelector('video');
+    if (!video || video.readyState < 2 || !video.videoWidth) continue;
+    try {
+      const faces = await faceapi.detectAllFaces(video,
+        new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.35 }));
+      drawFaceResult(uid, container, video, faces);
+    } catch (e) { console.warn('[专注度]', e); }
+  }
+}
+
+// 状态判定：有人脸+居中=在场；偏低=低头；偏左右=偏头；连续丢失=离开
+function judgeStatus(faces, vw, vh) {
+  if (!faces.length) return null;
+  if (faces.length > 1) return '多人';
+  const b = faces[0].box;
+  const cx = (b.x + b.width / 2) / vw;
+  const cy = (b.y + b.height / 2) / vh;
+  if (cy > 0.78) return '低头';
+  if (cx < 0.22 || cx > 0.78) return '偏头';
+  return '在场';
+}
+
+function drawFaceResult(uid, container, video, faces) {
+  const cv = ensureCanvas(container);
+  const w = container.clientWidth, h = container.clientHeight;
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+
+  const st = faceState[uid] || (faceState[uid] = { miss: 0, status: '在场' });
+  const raw = judgeStatus(faces, video.videoWidth, video.videoHeight);
+
+  let status;
+  if (raw === null) {
+    st.miss++;
+    status = st.miss >= 2 ? '离开' : st.status;   // 连续两轮没脸才算离开，防误判
+  } else {
+    st.miss = 0;
+    status = raw;
+  }
+
+  // 画框（缩放视频坐标到容器尺寸）
+  faces.forEach(f => {
+    const b = f.box;
+    const x = b.x / video.videoWidth * w;
+    const y = b.y / video.videoHeight * h;
+    const bw = b.width / video.videoWidth * w;
+    const bh = b.height / video.videoHeight * h;
+    ctx.strokeStyle = status === '在场' ? '#c9a227' : (status === '多人' ? '#3b82f6' : '#d98a6a');
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, bw, bh);
+  });
+
+  // 状态注释
+  const label = displayName(uid) + ' · ' + status + (faces.length > 1 ? '（' + faces.length + '人）' : '');
+  ctx.font = 'bold 13px "PingFang SC", sans-serif';
+  const tw = ctx.measureText(label).width;
+  const lx = faces.length ? (faces[0].box.x / video.videoWidth * w) : 8;
+  const ly = faces.length ? Math.max(16, faces[0].box.y / video.videoHeight * h - 6) : 16;
+  ctx.fillStyle = 'rgba(0,0,0,0.72)';
+  ctx.fillRect(lx - 2, ly - 14, tw + 10, 18);
+  ctx.fillStyle = status === '在场' ? '#e8cd6a' : '#d98a6a';
+  ctx.fillText(label, lx + 2, ly);
+
+  // 状态变化：提示 + 写进讨论缓存（苏轼可见）
+  if (status !== st.status) {
+    st.status = status;
+    if (uid !== myUserId || isAdmin) {
+      showSubLine('【系统】' + displayName(uid) + ' 状态：' + status);
+      pushConv('系统', displayName(uid) + ' ' + status);
+    }
+  }
+}
+
+// ---------- 分片上传 ----------
 const CHUNK_SIZE = 600 * 1024;
 function blobToB64(blob) {
   return new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.readAsDataURL(blob); });
@@ -167,13 +298,12 @@ async function uploadBigFile(file) {
     const b64 = await blobToB64(file.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE));
     await apiCall('meeting_file_upload', { filename: `${i}of${n}__${upid}__${safeBase}`, content_b64: b64 });
   }
-  return { name: safeBase, path: null, upid: upid, parts: n };   // path 由下载方按 upid 查
+  return { name: safeBase, path: null, upid: upid, parts: n };
 }
 function parsePartName(name) {
   const m = String(name).match(/^(\d+)of(\d+)__(\w+)__/);
   return m ? { i: Number(m[1]), n: Number(m[2]), upid: m[3], base: name.replace(/^\d+of\d+__\w+__/, '') } : null;
 }
-// 下载：单片直下；分片自动找齐拼合（上限 30MB）
 async function downloadAny(filePayload) {
   if (!filePayload.upid) return downloadSingle(filePayload.path, filePayload.name);
   const d = await apiCall('meeting_file_list');
@@ -184,16 +314,19 @@ async function downloadAny(filePayload) {
   const blobs = [];
   for (const x of parts) {
     const dd = await apiCall('meeting_file_download', { path: x.f.path });
-    const bin = atob(dd.content_b64);
-    const arr = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-    blobs.push(arr);
+    blobs.push(b64ToU8(dd.content_b64));
   }
   const total = blobs.reduce((a, b) => a + b.length, 0);
   const all = new Uint8Array(total);
   let off = 0;
   blobs.forEach(b => { all.set(b, off); off += b.length; });
   triggerDownload(new Blob([all]), filePayload.name);
+}
+function b64ToU8(b64) {
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return arr;
 }
 function triggerDownload(blob, name) {
   const a = document.createElement('a');
@@ -202,10 +335,7 @@ function triggerDownload(blob, name) {
 }
 async function downloadSingle(path, name) {
   const d = await apiCall('meeting_file_download', { path });
-  const bin = atob(d.content_b64);
-  const arr = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-  triggerDownload(new Blob([arr]), name);
+  triggerDownload(new Blob([b64ToU8(d.content_b64)]), name);
 }
 
 // ---------- 本地录屏 ----------
@@ -221,8 +351,7 @@ function initRecord() {
       mediaRecorder.ondataavailable = e => { if (e.data.size) recChunks.push(e.data); };
       mediaRecorder.onstop = function () {
         stream.getTracks().forEach(t => t.stop());
-        const blob = new Blob(recChunks, { type: 'video/webm' });
-        triggerDownload(blob, 'meeting_record_' + Date.now() + '.webm');
+        triggerDownload(new Blob(recChunks, { type: 'video/webm' }), 'meeting_record_' + Date.now() + '.webm');
         btn.innerText = '录制'; btn.classList.remove('recording');
         showSubLine('【系统】录屏已保存到本地');
       };
@@ -236,6 +365,9 @@ function initRecord() {
 // ---------- 聊天 + @补全 ----------
 function initChat() {
   document.getElementById('btnChat').onclick = function () {
+    document.getElementById('chatPanel').classList.toggle('collapsed');
+  };
+  document.getElementById('btnChatToggle').onclick = function () {
     document.getElementById('chatPanel').classList.toggle('collapsed');
   };
   document.getElementById('btnSendChat').onclick = sendChat;
@@ -262,7 +394,7 @@ function updateAtDropdown() {
   const names = [...roster, '苏轼'].filter(n => n.toLowerCase().includes(prefix));
   if (!names.length) { dd.style.display = 'none'; return; }
   dd.innerHTML = names.map(n =>
-    `<div data-name="${escapeHtml(n)}">${escapeHtml(n)}${n === '苏轼' ? '<span class="ai-tag">AI 成员</span>' : ''}</div>`).join('');
+    `<div data-name="${escapeHtml(n)}">${escapeHtml(displayName(n))}${n === '苏轼' ? '<span class="ai-tag">AI 成员</span>' : ''}</div>`).join('');
   dd.querySelectorAll('div').forEach(d => d.onmousedown = function (e) { e.preventDefault(); pickAt(d); });
   dd.style.display = 'block';
 }
@@ -279,7 +411,7 @@ function sendChat() {
   if (!text) return;
   input.value = '';
   document.getElementById('atDropdown').style.display = 'none';
-  showChat(myUserId, text, 'me');
+  showChat(displayName(myUserId), text, 'me');
   sendMsg(7, { t: 'chat', text });
   pushConv(myUserId, text);
   if (text.startsWith('@苏轼')) {
@@ -336,9 +468,9 @@ function initSubtitleButton() {
         if (e.results[i].isFinal) {
           const raw = e.results[i][0].transcript.trim();
           if (raw) {
-            showSubLine('【' + myUserId + '】' + raw);
+            showSubLine('【' + displayName(myUserId) + '】' + raw);
             pushConv(myUserId, raw);
-            sendMsg(1, { t: 'subtitle', text: '【' + myUserId + '】' + raw });
+            sendMsg(1, { t: 'subtitle', text: '【' + displayName(myUserId) + '】' + raw });
           }
         }
       }
@@ -349,7 +481,7 @@ function initSubtitleButton() {
   };
 }
 
-// ---------- 屏幕共享（5fps 1080p，共享文档足够且省带宽） ----------
+// ---------- 屏幕共享 ----------
 let sharing = false;
 function initScreenShare() {
   const btn = document.getElementById('btnShare');
@@ -384,7 +516,7 @@ function initMuteButtons() {
   };
 }
 
-// ---------- 会议文件（分片上传，单文件可达 30MB） ----------
+// ---------- 会议文件 ----------
 function initFiles() {
   document.getElementById('btnFiles').onclick = function () {
     document.getElementById('fileModal').style.display = 'flex';
@@ -396,15 +528,14 @@ function initFiles() {
     if (f.size > 30 * 1024 * 1024) { alert('文件超过 30MB，请压缩后上传'); return; }
     try {
       if (f.size > CHUNK_SIZE) {
-        const r = await uploadBigFile(f);
+        await uploadBigFile(f);
         showSubLine('【系统】文件上传成功（分片）：' + f.name);
-        sendMsg(6, { t: 'file', name: f.name });
       } else {
         const b64 = await blobToB64(f);
-        const up = await apiCall('meeting_file_upload', { filename: f.name, content_b64: b64 });
+        await apiCall('meeting_file_upload', { filename: f.name, content_b64: b64 });
         showSubLine('【系统】文件上传成功：' + f.name);
-        sendMsg(6, { t: 'file', name: f.name });
       }
+      sendMsg(6, { t: 'file', name: f.name });
       refreshFileList();
     } catch (e) { alert('上传失败：' + e.message); }
   };
@@ -547,7 +678,7 @@ function uploadBoardBg() {
   r.onload = () => {
     setBoardBg(r.result);
     sendMsg(9, { t: 'bbg', dataUrl: r.result });
-    showSubLine('【系统】' + myUserId + ' 更新了批注底图');
+    showSubLine('【系统】' + displayName(myUserId) + ' 更新了批注底图');
   };
   r.readAsDataURL(f);
 }
