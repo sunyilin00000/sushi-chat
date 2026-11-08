@@ -26,14 +26,21 @@
         .ctrl-buttons button.solid { background: var(--gold); color: #000; border-color: var(--gold); }
         .ctrl-buttons button.alert { border-color: #8a3a2a; color: #d98a6a; }
         .ctrl-buttons button.alert:hover { background: #8a3a2a; color: #fff; }
-
+        .ctrl-buttons button.recording { background: #8a3a2a; border-color: #8a3a2a; color: #fff; }
         .main-row { flex: 1; display: flex; min-height: 0; }
         #stage { flex: 1; position: relative; display: flex; flex-direction: column; min-width: 0; }
         #bigscreen { height: 52%; min-height: 220px; background: #000; display: none; border-bottom: 1px solid var(--gold-dim); }
         #screen-share-view { width: 100%; height: 100%; }
         #remote-videos { flex: 1; display: flex; flex-wrap: wrap; gap: 12px; padding: 16px;
                          align-content: flex-start; justify-content: center; overflow-y: auto; }
-        .remote-cell { width: 300px; height: 225px; background: #000; border: 1px solid var(--line); }
+        /* ★ 成员格子：可点击切大流，右上角禁言按钮 */
+        .remote-cell { width: 300px; height: 225px; background: #000; border: 1px solid var(--line);
+                       cursor: pointer; position: relative; }
+        .mute-btn { position: absolute; top: 6px; right: 6px; z-index: 10; padding: 3px 10px; font-size: 11px;
+                    letter-spacing: 1px; background: rgba(0,0,0,0.7); border: 1px solid var(--gold-dim);
+                    color: var(--gold); cursor: pointer; font-family: inherit; }
+        .mute-btn:hover { background: var(--gold); color: #000; }
+        .mute-btn.muted { background: #8a3a2a; border-color: #8a3a2a; color: #fff; }
         #vote-mask { display: none; position: absolute; inset: 0; background: rgba(4,4,6,0.93); z-index: 50;
                      align-items: center; justify-content: center; text-align: center; padding: 40px; }
         .mask-frame { max-width: 640px; border: 1px solid var(--gold-dim); padding: 40px 50px; background: var(--panel); }
@@ -46,8 +53,6 @@
         @keyframes subfade { 0% {opacity:0;} 8% {opacity:1;} 80% {opacity:1;} 100% {opacity:0;} }
         .local-box { position: fixed; left: 18px; bottom: 18px; width: 200px; height: 150px; background: #000;
                      border: 1px solid var(--gold-dim); z-index: 60; }
-
-        /* 右侧常驻聊天栏 */
         #chatPanel { width: 320px; border-left: 1px solid var(--gold-dim); background: var(--panel);
                      display: flex; flex-direction: column; flex-shrink: 0; position: relative; }
         #chatPanel.collapsed { width: 0; border: none; overflow: hidden; }
@@ -69,14 +74,11 @@
                      color: var(--text); font-size: 13px; font-family: inherit; }
         #btnSendChat { padding: 0 18px; background: var(--gold); border: none; color: #000; font-weight: 600;
                        letter-spacing: 2px; cursor: pointer; font-size: 13px; font-family: inherit; }
-        /* ★ @ 成员下拉补全 */
         #atDropdown { display: none; position: absolute; bottom: 96px; left: 12px; right: 12px; max-height: 170px;
                       overflow-y: auto; background: var(--panel2); border: 1px solid var(--gold-dim); z-index: 120; }
         #atDropdown div { padding: 9px 12px; font-size: 13px; cursor: pointer; letter-spacing: 1px; }
         #atDropdown div:hover, #atDropdown div.active { background: var(--gold); color: #000; }
         #atDropdown .ai-tag { color: var(--gold-dim); font-size: 11px; margin-left: 8px; }
-
-        /* 通用弹窗 */
         .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none;
                  align-items: center; justify-content: center; z-index: 100; }
         .modal-content { background: var(--panel); border: 1px solid var(--gold-dim); width: 92%; max-width: 460px;
@@ -97,8 +99,6 @@
         #fileList .file-item button { padding: 4px 12px; font-size: 12px; border: 1px solid var(--gold-dim);
                                       background: none; color: var(--gold); cursor: pointer; font-family: inherit; }
         #fileList .file-item button:hover { background: var(--gold); color: #000; }
-
-        /* ★ 协同批注面板 */
         #boardModal .modal-content { max-width: 920px; width: 94%; height: 86vh; display: flex; flex-direction: column; }
         .board-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         .board-toolbar .tool { padding: 6px 14px; background: transparent; border: 1px solid var(--gold-dim);
@@ -106,7 +106,7 @@
         .board-toolbar .tool.active { background: var(--gold); color: #000; }
         .board-toolbar input[type=color] { width: 34px; height: 30px; border: 1px solid var(--gold-dim); background: none; cursor: pointer; }
         .board-toolbar .alert { border-color: #8a3a2a; color: #d98a6a; }
-        .board-toolbar .file-btn { font-size: 11px; color: var(--muted); letter-spacing: 1px; }
+        .board-toolbar .file-btn { font-size: 11px; color: var(--muted); letter-spacing: 1px; cursor: pointer; }
         .board-toolbar .file-btn input { display: none; }
         #boardWrap { flex: 1; position: relative; background: #ffffff; margin-top: 12px; overflow: hidden; }
         #boardCanvas { width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
@@ -128,6 +128,7 @@
             <button id="btnSubtitle">实时字幕</button>
             <button id="btnShare">屏幕共享</button>
             <button id="btnBoard">协同批注</button>
+            <button id="btnRecord">录制</button>
             <button id="btnChatToggle">文字频道</button>
             <button class="hidden" id="btnVote">发起表决</button>
             <button class="alert hidden" id="btnMuteAll">全员禁言</button>
@@ -162,7 +163,6 @@
 
     <div class="local-box" id="local-video"></div>
 
-    <!-- 协同批注 -->
     <div class="modal" id="boardModal">
         <div class="modal-content">
             <h3>协同批注 COLLABORATIVE BOARD</h3>
@@ -184,7 +184,6 @@
         </div>
     </div>
 
-    <!-- 表决弹窗 -->
     <div class="modal" id="voteModal">
         <div class="modal-content">
             <h3>表决 VOTING</h3>
@@ -208,13 +207,12 @@
         </div>
     </div>
 
-    <!-- 文件面板 -->
     <div class="modal" id="fileModal">
         <div class="modal-content">
             <h3>会议文件 FILES</h3>
             <div id="fileList"><p style="color:var(--muted);font-size:13px;">载入中…</p></div>
             <input type="file" id="fileInput" style="margin-top:14px;color:var(--muted);font-size:13px;">
-            <button class="btn" id="btnUploadFile">上传（单文件不超过 700KB）</button>
+            <button class="btn" id="btnUploadFile">上传（大文件自动分片）</button>
         </div>
     </div>
 
