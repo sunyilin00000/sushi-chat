@@ -4,366 +4,80 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>星环终端 - 线上会议</title>
-    <!-- 双重 CDN 保障，防止某个源抽风 -->
-    <script src="https://unpkg.zhimg.com/trtc-sdk-v5@latest/trtc-sdk-v5.js"></script>
-    <script>
-        if (typeof TRTC === 'undefined') {
-            document.write('<script src="https://cdn.jsdelivr.net/npm/trtc-sdk-v5@latest/trtc-sdk-v5.js"><\/script>');
-        }
-    </script>
     <style>
+        /* ===== 页面基础样式 ===== */
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background-color: #0f172a; color: #fff; font-family: -apple-system, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-        .header { height: 60px; background: #1e293b; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; z-index: 10; }
-        .header h1 { font-size: 18px; color: #38bdf8; }
-        .header .info { font-size: 14px; color: #94a3b8; }
-        .notice-bar { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); background: rgba(239, 68, 68, 0.9); color: white; padding: 8px 20px; border-radius: 8px; font-size: 14px; display: none; z-index: 50; }
-        .video-container { flex: 1; position: relative; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px; padding: 20px; overflow-y: auto; }
-        .video-wrapper { background: #1e293b; border-radius: 12px; overflow: hidden; position: relative; width: calc(50% - 10px); aspect-ratio: 16/9; border: 1px solid #334155; }
-        @media (max-width: 800px) { .video-wrapper { width: 100%; } }
-        .video-wrapper video { width: 100%; height: 100%; object-fit: cover; }
-        .video-wrapper.local { position: fixed; bottom: 150px; right: 20px; width: 200px; height: 150px; z-index: 20; box-shadow: 0 4px 20px rgba(0,0,0,0.5); border-color: #38bdf8; }
-        .user-label { position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 4px; font-size: 12px; }
-        .speaking-indicator { position: absolute; top: 10px; right: 10px; background: #22c55e; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; display: none; }
-        .subtitle-box { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); width: 80%; max-width: 800px; background: rgba(0,0,0,0.7); padding: 10px 20px; border-radius: 8px; text-align: center; font-size: 16px; color: #e2e8f0; z-index: 15; display: none; min-height: 44px; }
-        .subtitle-box span { color: #38bdf8; font-weight: bold; }
-        .controls { height: 80px; background: #1e293b; display: flex; justify-content: center; align-items: center; gap: 15px; z-index: 10; flex-wrap: wrap; }
-        .btn { height: 44px; padding: 0 20px; border-radius: 8px; border: none; background: #334155; color: #fff; font-size: 14px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        .btn:hover { background: #475569; }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn.active { background: #ef4444; }
-        .btn.speak-btn { background: #22c55e; color: #0f172a; }
-        .btn.speak-btn.speaking { background: #ef4444; color: white; }
-        .btn.leave { background: #ef4444; }
-        .btn.leave:hover { background: #dc2626; }
-        .vote-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.95); z-index: 100; display: none; flex-direction: column; justify-content: center; align-items: center; padding: 40px; }
-        .vote-panel { background: #1e293b; border: 2px solid #38bdf8; border-radius: 16px; width: 80%; max-width: 800px; padding: 30px; display: flex; flex-direction: column; gap: 20px; }
-        .vote-panel h2 { color: #38bdf8; font-size: 24px; text-align: center; margin-bottom: 10px; }
-        .vote-option { background: #0f172a; border: 1px solid #334155; padding: 15px; border-radius: 8px; cursor: pointer; transition: 0.2s; font-size: 18px; display: flex; justify-content: space-between; align-items: center; }
-        .vote-option:hover { background: #38bdf8; color: #0f172a; }
-        .vote-close { margin-top: 20px; background: #ef4444; color: white; padding: 12px 30px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; }
-        .vote-create-form { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 400px; }
-        .vote-create-form input { padding: 10px; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: white; font-size: 14px; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #0f172a;          /* 深色背景，突出视频画面 */
+            color: #e2e8f0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        /* 顶部栏：房间号 + 控制按钮 */
+        .top-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 20px; background: #1e293b; border-bottom: 1px solid #334155;
+        }
+        .top-bar h1 { font-size: 18px; letter-spacing: 2px; }
+        .top-bar .room-label { font-size: 14px; color: #94a3b8; margin-left: 10px; }
+        .ctrl-buttons { display: flex; gap: 10px; }
+        .ctrl-buttons button {
+            padding: 8px 14px; border: none; border-radius: 6px; font-size: 13px;
+            cursor: pointer; font-weight: bold; color: white;
+        }
+        .btn-mute-all { background: #ef4444; }
+        .btn-unmute-all { background: #10b981; }
+        .btn-leave { background: #475569; }
+        /* 远端画面墙：格子自动排列 */
+        .remote-wall {
+            flex: 1; display: flex; flex-wrap: wrap; gap: 10px;
+            padding: 15px; align-content: flex-start; justify-content: center; overflow-y: auto;
+        }
+        .remote-cell {
+            width: 320px; height: 240px; background: #000;
+            border-radius: 8px; overflow: hidden; position: relative;
+        }
+        /* 本地自己的小画面：右下角悬浮 */
+        .local-box {
+            position: fixed; right: 20px; bottom: 20px;
+            width: 200px; height: 150px; background: #000;
+            border: 2px solid #334155; border-radius: 8px; overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
     </style>
 </head>
 <body>
-
-    <div class="header">
-        <h1>星环终端 · 线上会议</h1>
-        <div class="info" id="roomInfo">正在检查环境...</div>
-    </div>
-
-    <div class="notice-bar" id="noticeBar"></div>
-
-    <div class="video-container" id="videoContainer"></div>
-
-    <div class="subtitle-box" id="subtitleBox"></div>
-
-    <div class="controls">
-        <button class="btn speak-btn" id="speakBtn" onclick="toggleSpeak()">点击发言</button>
-        <button class="btn" id="camBtn" onclick="toggleCam()">摄像头开启</button>
-        <button class="btn" id="subBtn" onclick="toggleSubtitle()">开启实时字幕</button>
-        <button class="btn" id="voteBtn" onclick="openVoteCreate()">发起匿名投票</button>
-        <button class="btn" id="muteAllBtn" onclick="toggleMuteAll()" style="display: none; background: #f59e0b; color: #0f172a;">全体禁言</button>
-        <button class="btn leave" onclick="leaveRoom()">挂断退出</button>
-    </div>
-
-    <div class="vote-overlay" id="voteOverlay">
-        <div class="vote-create-form" id="voteCreatePanel" style="display:none;">
-            <h2 style="color:#38bdf8; text-align:center;">发起匿名投票</h2>
-            <input type="text" id="voteTopic" placeholder="输入投票议题">
-            <input type="text" id="voteOpt1" placeholder="选项 1">
-            <input type="text" id="voteOpt2" placeholder="选项 2">
-            <button class="btn" style="background:#38bdf8; color:#0f172a; margin-top:10px;" onclick="sendVoteCreate()">发送投票</button>
-            <button class="vote-close" onclick="closeVoteOverlay()">取消</button>
+    <!-- 顶部栏 -->
+    <div class="top-bar">
+        <div>
+            <span style="color:#38bdf8;">星环会议</span>
+            <span class="room-label">房间号：<span id="roomLabel">-</span></span>
         </div>
-        <div class="vote-panel" id="voteActivePanel" style="display:none;">
-            <h2 id="activeVoteTopic">投票议题</h2>
-            <div id="activeVoteOptions"></div>
-            <button class="vote-close" onclick="closeVoteOverlay()">关闭</button>
+        <div class="ctrl-buttons">
+            <!-- 管理员一键全体禁言/解除（本端静音远端声音；强制别人关麦的自定义信令后面再加） -->
+            <button class="btn-mute-all" onclick="window.meeting && window.meeting.muteAllRemoteAudio()">全体静音</button>
+            <button class="btn-unmute-all" onclick="window.meeting && window.meeting.unmuteAllRemoteAudio()">解除静音</button>
+            <button class="btn-leave" onclick="window.meeting && window.meeting.leave()">离开会议</button>
         </div>
     </div>
 
+    <!-- 远端成员画面墙（远端进房后由 meeting-boot.js 自动往里加格子） -->
+    <div class="remote-wall" id="remote-videos"></div>
+
+    <!-- 自己的摄像头画面（SDK 渲染目标，id 必须是 local-video） -->
+    <div class="local-box" id="local-video"></div>
+
+    <!-- 页面加载后显示当前房间号（仅展示用） -->
     <script>
-        if (typeof TRTC === 'undefined') {
-            alert("腾讯会议组件加载失败，请检查网络或强制刷新页面重试！");
-        }
-
-        const TEAM_API = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com"; 
-        const ROOM_ID = 1001; 
-        
-        let trtc = null;
-        let isCamMuted = false;
-        let recognition = null;
-        let isSubtitlesOn = false;
-        
-        let isAdmin = false;
-        let myUserId = "";
-        let isSpeaking = false;
-        let isGlobalMuted = false;
-        let currentSpeaker = "";
-
-        const token = localStorage.getItem('xh_token');
-        const userStr = localStorage.getItem('xh_user');
-        if (!token || !userStr) { alert("请先登录！"); location.href = 'member.html'; }
-        const userInfo = JSON.parse(userStr);
-        if (userInfo.role === 'admin') { isAdmin = true; }
-
-        async function toggleSpeak() {
-            if (!trtc) return;
-            if (isGlobalMuted && !isAdmin) {
-                alert("管理员已开启全体禁言，你无法发言。");
-                return;
-            }
-
-            if (!isSpeaking) {
-                try {
-                    await trtc.updateLocalAudio({ mute: false });
-                    isSpeaking = true;
-                    document.getElementById('speakBtn').innerText = "正在发言 (点击闭麦)";
-                    document.getElementById('speakBtn').classList.add('speaking');
-                    trtc.sendCustomMessage({ cmdId: 2, data: JSON.stringify({ type: "speak_start", userId: myUserId }) });
-                } catch (e) {
-                    console.error("麦克风打开失败", e);
-                }
-            } else {
-                await trtc.updateLocalAudio({ mute: true });
-                isSpeaking = false;
-                document.getElementById('speakBtn').innerText = "点击发言";
-                document.getElementById('speakBtn').classList.remove('speaking');
-                trtc.sendCustomMessage({ cmdId: 2, data: JSON.stringify({ type: "speak_end", userId: myUserId }) });
-            }
-        }
-
-        async function forceMuteMe() {
-            if (!trtc) return;
-            if (isSpeaking) {
-                await trtc.updateLocalAudio({ mute: true });
-                isSpeaking = false;
-                document.getElementById('speakBtn').innerText = "点击发言";
-                document.getElementById('speakBtn').classList.remove('speaking');
-            }
-        }
-
-        async function toggleMuteAll() {
-            if (!isAdmin) return;
-            isGlobalMuted = !isGlobalMuted;
-            const btn = document.getElementById('muteAllBtn');
-            
-            if (isGlobalMuted) {
-                btn.innerText = "解除禁言";
-                btn.style.background = "#22c55e";
-                trtc.sendCustomMessage({ cmdId: 2, data: JSON.stringify({ type: "mute_all", state: true }) });
-                await forceMuteMe();
-                showNotice("管理员开启了全体禁言");
-            } else {
-                btn.innerText = "全体禁言";
-                btn.style.background = "#f59e0b";
-                trtc.sendCustomMessage({ cmdId: 2, data: JSON.stringify({ type: "mute_all", state: false }) });
-                showNotice("管理员解除了全体禁言");
-            }
-        }
-
-        function showNotice(msg) {
-            const bar = document.getElementById('noticeBar');
-            bar.innerText = msg;
-            bar.style.display = 'block';
-            setTimeout(() => { bar.style.display = 'none'; }, 3000);
-        }
-
-        function initSpeechRecognition() {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) { alert("浏览器不支持语音识别"); return; }
-            recognition = new SpeechRecognition();
-            recognition.lang = 'zh-CN';
-            recognition.continuous = true;
-            recognition.interimResults = true;
-            recognition.onresult = (event) => {
-                let finalTranscript = '';
-                let interimTranscript = '';
-                for (let i = event.resultIndex; i < event.results.length; i++) {
-                    const transcript = event.results[i][0].transcript;
-                    if (event.results[i].isFinal) { finalTranscript += transcript; } else { interimTranscript += transcript; }
-                }
-                const box = document.getElementById('subtitleBox');
-                box.style.display = 'block';
-                if (finalTranscript) { box.innerHTML = `<span>我:</span> ${finalTranscript}`; } else { box.innerHTML = `<span>我:</span> ${interimTranscript}...`; }
-            };
-        }
-
-        function toggleSubtitle() {
-            if (!recognition) initSpeechRecognition();
-            const btn = document.getElementById('subBtn');
-            if (!isSubtitlesOn) {
-                recognition.start(); isSubtitlesOn = true; btn.classList.add('active'); btn.innerText = "关闭实时字幕"; document.getElementById('subtitleBox').style.display = 'block';
-            } else {
-                recognition.stop(); isSubtitlesOn = false; btn.classList.remove('active'); btn.innerText = "开启实时字幕"; document.getElementById('subtitleBox').style.display = 'none';
-            }
-        }
-
-        async function initMeeting() {
-            if (typeof TRTC === 'undefined') return;
-            try {
-                const res = await fetch(TEAM_API, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: "get_trtc_sig", token: token })
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || "获取签名失败");
-
-                trtc = TRTC.create();
-                myUserId = data.userId;
-                
-                if (isAdmin) document.getElementById('muteAllBtn').style.display = 'block';
-
-                document.getElementById('roomInfo').innerText = "请允许使用摄像头和麦克风...";
-                try {
-                    await trtc.startLocalVideo();
-                    await trtc.startLocalAudio();
-                    await trtc.updateLocalAudio({ mute: true }); 
-                } catch (permError) {
-                    alert("进入会议失败：必须允许摄像头和麦克风权限！"); return; 
-                }
-
-                await trtc.enterRoom({ sdkAppId: data.sdkAppId, userId: data.userId, userSig: data.userSig, roomId: ROOM_ID });
-                document.getElementById('roomInfo').innerText = `已连接 | 账号: ${data.userId}`;
-
-                trtc.on(TRTC.EVENT.REMOTE_USER_ENTER, event => {
-                    const userId = event.userId;
-                    trtc.startRemoteVideo({ userId, streamType: TRTC.TYPE.STREAM_TYPE_MAIN }).then(() => {
-                        const view = trtc.getVideoView(userId);
-                        const wrapper = document.createElement('div');
-                        wrapper.className = 'video-wrapper'; wrapper.id = `remote_${userId}`;
-                        wrapper.innerHTML = `<div class="user-label">${userId}</div><div class="speaking-indicator" id="speaking_${userId}">发言中</div>`;
-                        wrapper.appendChild(view);
-                        document.getElementById('videoContainer').appendChild(wrapper);
-                    });
-                });
-
-                trtc.on(TRTC.EVENT.REMOTE_USER_LEAVE, event => {
-                    const el = document.getElementById(`remote_${event.userId}`);
-                    if (el) el.remove();
-                });
-
-                trtc.on(TRTC.EVENT.CUSTOM_MESSAGE, event => {
-                    try {
-                        const msg = JSON.parse(event.data);
-                        if (msg.type === "speak_start") {
-                            currentSpeaker = msg.userId;
-                            if (msg.userId !== myUserId) { forceMuteMe(); showNotice(`${msg.userId} 正在发言`); }
-                            document.querySelectorAll('.speaking-indicator').forEach(el => el.style.display = 'none');
-                            const indicator = document.getElementById(`speaking_${msg.userId}`);
-                            if (indicator) indicator.style.display = 'block';
-                        } else if (msg.type === "speak_end") {
-                            if (currentSpeaker === msg.userId) {
-                                currentSpeaker = "";
-                                document.querySelectorAll('.speaking-indicator').forEach(el => el.style.display = 'none');
-                            }
-                        } else if (msg.type === "mute_all") {
-                            isGlobalMuted = msg.state;
-                            if (isGlobalMuted) {
-                                forceMuteMe(); showNotice("管理员开启了全体禁言");
-                                if (!isAdmin) { document.getElementById('speakBtn').disabled = true; document.getElementById('speakBtn').innerText = "已被禁言"; }
-                            } else {
-                                showNotice("管理员解除了全体禁言");
-                                if (!isAdmin) { document.getElementById('speakBtn').disabled = false; document.getElementById('speakBtn').innerText = "点击发言"; }
-                            }
-                        } else if (msg.type === "vote_create") {
-                            currentVote = { topic: msg.topic, options: msg.options, votes: {} };
-                            showActiveVote();
-                        } else if (msg.type === "vote_cast") {
-                            if (currentVote && currentVote.topic === msg.topic) {
-                                currentVote.votes[msg.index] = (currentVote.votes[msg.index] || 0) + 1;
-                                updateVoteResults();
-                            }
-                        }
-                    } catch (e) { console.error("消息解析失败", e); }
-                });
-
-                const localView = trtc.getVideoView(data.userId);
-                const localWrapper = document.createElement('div');
-                localWrapper.className = 'video-wrapper local'; localWrapper.id = 'localVideo';
-                localWrapper.innerHTML = `<div class="user-label">我 (${data.userId})</div>`;
-                localWrapper.appendChild(localView);
-                document.body.appendChild(localWrapper);
-
-            } catch (error) {
-                console.error(error);
-                alert("进入会议失败：" + error.message);
-            }
-        }
-
-        async function toggleCam() {
-            if (!trtc) return;
-            isCamMuted = !isCamMuted;
-            await trtc.updateLocalVideo({ mute: isCamMuted });
-            const btn = document.getElementById('camBtn');
-            btn.classList.toggle('active', isCamMuted);
-            btn.innerText = isCamMuted ? "摄像头已关" : "摄像头开启";
-        }
-
-        async function leaveRoom() {
-            if (recognition) recognition.stop();
-            if (trtc) { await trtc.exitRoom(); location.href = 'member.html'; }
-        }
-
-        let currentVote = null;
-
-        function openVoteCreate() {
-            document.getElementById('voteOverlay').style.display = 'flex';
-            document.getElementById('voteCreatePanel').style.display = 'flex';
-            document.getElementById('voteActivePanel').style.display = 'none';
-        }
-
-        function sendVoteCreate() {
-            const topic = document.getElementById('voteTopic').value.trim();
-            const opt1 = document.getElementById('voteOpt1').value.trim();
-            const opt2 = document.getElementById('voteOpt2').value.trim();
-            if (!topic || !opt1 || !opt2) { alert("请填全议题和至少两个选项"); return; }
-
-            currentVote = { topic, options: [opt1, opt2], votes: {} };
-            if (trtc) trtc.sendCustomMessage({ cmdId: 3, data: JSON.stringify({ type: "vote_create", topic, options: [opt1, opt2] }) });
-            showActiveVote();
-        }
-
-        function showActiveVote() {
-            document.getElementById('voteCreatePanel').style.display = 'none';
-            document.getElementById('voteActivePanel').style.display = 'flex';
-            document.getElementById('activeVoteTopic').innerText = currentVote.topic;
-            
-            const container = document.getElementById('activeVoteOptions');
-            container.innerHTML = '';
-            currentVote.options.forEach((opt, index) => {
-                const btn = document.createElement('div');
-                btn.className = 'vote-option';
-                btn.innerHTML = `<span>${opt}</span> <span class="count" id="vote_count_${index}">0票</span>`;
-                btn.onclick = () => castVote(index);
-                container.appendChild(btn);
-            });
-            updateVoteResults();
-        }
-
-        function castVote(index) {
-            if (!currentVote) return;
-            currentVote.votes[index] = (currentVote.votes[index] || 0) + 1;
-            updateVoteResults();
-            if (trtc) trtc.sendCustomMessage({ cmdId: 3, data: JSON.stringify({ type: "vote_cast", topic: currentVote.topic, index: index }) });
-            alert("投票成功！");
-        }
-
-        function updateVoteResults() {
-            if (!currentVote) return;
-            currentVote.options.forEach((_, index) => {
-                const countEl = document.getElementById(`vote_count_${index}`);
-                if (countEl) countEl.innerText = `${currentVote.votes[index] || 0} 票`;
-            });
-        }
-
-        function closeVoteOverlay() { document.getElementById('voteOverlay').style.display = 'none'; }
-
-        window.onload = () => {
-            initMeeting();
-        };
+        document.getElementById('roomLabel').innerText =
+            new URLSearchParams(location.search).get('room') || '101';
     </script>
+
+    <!-- SDK 容错加载器（必须先于 meeting-boot.js 引入） -->
+    <script src="trtc-loader.js"></script>
+    <!-- 会议初始化主逻辑 -->
+    <script src="meeting-boot.js"></script>
 </body>
 </html>
