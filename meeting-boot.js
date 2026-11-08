@@ -1,6 +1,5 @@
 // meeting-boot.js
-// 作用：会议初始化主流程——登录检查 → 加载SDK → 拿UserSig → 进房 → 开摄像头麦 → 广播 ready 事件
-// 本文件只管"进房和流"，业务功能（投票/禁言/字幕/文件/共享）在 meeting-features.js
+// 作用：会议初始化——登录检查 → 输入会议密钥 → 加载SDK → 校验密钥并拿UserSig → 进房 → 开摄像头麦 → 广播 ready
 document.addEventListener('DOMContentLoaded', async function () {
   const TEAM_API = "https://1502956590-0kdly2qr1v.ap-nanjing.tencentscf.com";
 
@@ -9,6 +8,12 @@ document.addEventListener('DOMContentLoaded', async function () {
     const token = localStorage.getItem('xh_token');
     if (!token) { location.href = 'member.html'; return; }
 
+    // ★ 房间号提前算出来，密钥弹窗要用
+    const roomId = new URLSearchParams(location.search).get('room') || '101';
+
+    // ★ 输入会议密钥（房间未设密钥时直接点"确定"即可跳过）
+    const roomKey = prompt('请输入房间 ' + roomId + ' 的会议密钥（未设置则留空直接确定）', '') || '';
+
     // 容错加载 SDK
     const TRTC = await window.loadTRTC();
     if (!(await TRTC.isSupported())) {
@@ -16,19 +21,19 @@ document.addEventListener('DOMContentLoaded', async function () {
       return;
     }
 
-    // 获取 UserSig
+    // ★ 获取 UserSig：后端会校验 roomKey，密钥错误直接返回 403
     const resp = await fetch(TEAM_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'get_trtc_sig', token: token })
+      body: JSON.stringify({ action: 'get_trtc_sig', token: token, data: { room: roomId, room_key: roomKey } })
     });
-    if (!resp.ok) throw new Error('获取 UserSig 失败: HTTP ' + resp.status);
+    if (!resp.ok) throw new Error((resp.status === 403) ? '会议密钥错误，请刷新页面重新输入' : '获取 UserSig 失败: HTTP ' + resp.status);
     const sigData = await resp.json();
     if (sigData.error) throw new Error('获取 UserSig 失败: ' + sigData.error);
 
     const trtc = TRTC.create();
 
-    // 远端用户进房：普通摄像头流建格子；屏幕共享流由 VIDEO_AVAILABLE 事件处理
+    // 远端用户进房：建格子
     trtc.on(TRTC.EVENT.REMOTE_USER_ENTER, function (event) {
       const wall = document.getElementById('remote-videos');
       if (wall && !document.getElementById('cell-' + event.userId)) {
@@ -39,29 +44,18 @@ document.addEventListener('DOMContentLoaded', async function () {
       }
     });
 
-    // ★ 核心：区分普通视频流和屏幕共享流（sub 流）
+    // 区分普通视频流和屏幕共享流
     trtc.on(TRTC.EVENT.REMOTE_VIDEO_AVAILABLE, function (event) {
       if (event.streamType === TRTC.TYPE.STREAM_TYPE_SUB) {
-        // 屏幕共享：渲染到大屏
         const big = document.getElementById('bigscreen');
         big.style.display = 'block';
         big.dataset.sharer = event.userId;
-        trtc.startRemoteVideo({
-          userId: event.userId,
-          streamType: event.streamType,
-          view: 'screen-share-view'
-        });
+        trtc.startRemoteVideo({ userId: event.userId, streamType: event.streamType, view: 'screen-share-view' });
       } else {
-        // 普通摄像头：渲染到成员格子
-        trtc.startRemoteVideo({
-          userId: event.userId,
-          streamType: event.streamType,
-          view: 'cell-' + event.userId
-        });
+        trtc.startRemoteVideo({ userId: event.userId, streamType: event.streamType, view: 'cell-' + event.userId });
       }
     });
 
-    // 远端停止屏幕共享：收起大屏
     trtc.on(TRTC.EVENT.REMOTE_VIDEO_UNAVAILABLE, function (event) {
       if (event.streamType === TRTC.TYPE.STREAM_TYPE_SUB) {
         const big = document.getElementById('bigscreen');
@@ -69,7 +63,6 @@ document.addEventListener('DOMContentLoaded', async function () {
       }
     });
 
-    // 远端退房：删格子 + 若是共享者则收大屏
     trtc.on(TRTC.EVENT.REMOTE_USER_LEAVE, function (event) {
       const cell = document.getElementById('cell-' + event.userId);
       if (cell) cell.remove();
@@ -77,14 +70,12 @@ document.addEventListener('DOMContentLoaded', async function () {
       if (big.dataset.sharer === event.userId) big.style.display = 'none';
     });
 
-    // ★ 被踢下线（同账号在别处进房等）：给出提示并返回工作台
-    trtc.on(TRTC.EVENT.KICKED_OUT, function (event) {
+    trtc.on(TRTC.EVENT.KICKED_OUT, function () {
       alert('你已被请出房间（可能在其他设备用同一账号进入了会议）');
       location.href = 'member.html';
     });
 
     // 进房
-    const roomId = new URLSearchParams(location.search).get('room') || '101';
     await trtc.enterRoom({
       sdkAppId: sigData.sdkAppId,
       userId: sigData.userId,
@@ -104,22 +95,16 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     // 暴露控制接口
     window.meeting = {
-      trtc: trtc,
-      TRTC: TRTC,
-      userId: sigData.userId,
-      roomId: Number(roomId),
-      TEAM_API: TEAM_API,
-      token: token,
-      // 本端静音所有远端声音（只影响自己听）
+      trtc: trtc, TRTC: TRTC,
+      userId: sigData.userId, roomId: Number(roomId),
+      TEAM_API: TEAM_API, token: token,
       muteRemoteAudio: function () { trtc.muteRemoteAudio('*', true); },
       unmuteRemoteAudio: function () { trtc.muteRemoteAudio('*', false); },
-      // 本端麦克风静音/恢复（被管理员禁言时调用）
       muteLocalAudio: function () { trtc.updateLocalAudio({ mute: true }); },
       unmuteLocalAudio: function () { trtc.updateLocalAudio({ mute: false }); },
       leave: async function () { await trtc.exitRoom(); location.href = 'member.html'; }
     };
     console.log('[会议] 初始化完成');
-    // 通知业务功能模块可以开工了
     window.dispatchEvent(new Event('meeting-ready'));
   } catch (err) {
     console.error('[会议] 初始化失败:', err);
